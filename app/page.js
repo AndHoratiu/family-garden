@@ -1,243 +1,277 @@
 import Link from "next/link";
-import { siteContent } from "@/lib/site-content";
-import { products } from "@/lib/products-data";
+import { siteContent, siteImages } from "@/lib/site-content";
+import { products, productCategories } from "@/lib/products-data";
 import { Button } from "@/components/ui/button";
 import {
-  Sprout,
+  MapPin,
+  RefreshCcw,
   Truck,
-  Package,
-  Leaf,
+  Store,
+  CreditCard,
+  Sprout,
+  ListChecks,
+  ShoppingCart,
   ArrowRight,
-  CheckCircle2,
-  Star,
+  MessageCircle,
+  Phone,
 } from "lucide-react";
 
-const iconMap = { sprout: Sprout, truck: Truck, package: Package };
+const trustItems = [
+  { icon: MapPin, label: "Produse locale" },
+  { icon: RefreshCcw, label: "Disponibilitate actualizată" },
+  { icon: Truck, label: "Livrare locală" },
+  { icon: Store, label: "Ridicare personală" },
+  { icon: CreditCard, label: "Plată online sau ramburs" },
+];
+
+const whyItems = [
+  {
+    icon: Sprout,
+    title: "Cultivat local",
+    text: "Produse crescute cu grijă, aproape de client.",
+  },
+  {
+    icon: ListChecks,
+    title: "Stoc clar și transparent",
+    text: "Vezi imediat ce este disponibil.",
+  },
+  {
+    icon: ShoppingCart,
+    title: "Comandă simplă",
+    text: "Livrare locală sau ridicare personală.",
+  },
+];
+
+const WHATSAPP_LINK = `https://wa.me/40749476386?text=${encodeURIComponent("Bună! Aș dori să comand de la Family Garden.")}`;
+
+const stockBadge = (p) => {
+  if (p.stock === 0) return { label: "Indisponibil", cls: "bg-red-100 text-red-700" };
+  if (p.stock <= 10) return { label: "Stoc limitat", cls: "bg-amber-100 text-amber-700" };
+  return { label: "În stoc", cls: "bg-emerald-100 text-emerald-700" };
+};
 
 const HomePage = () => {
-  const featured = products.filter((p) => p.featured).slice(0, 6);
+  const featured = products.filter((p) => p.featured && p.active).slice(0, 4);
 
   return (
     <div>
       {/* HERO */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -left-32 top-20 h-72 w-72 rounded-full bg-[#cfe3c7] opacity-50 blur-3xl" />
-        <div className="pointer-events-none absolute -right-32 top-40 h-96 w-96 rounded-full bg-[#e7d8b6] opacity-40 blur-3xl" />
-
-        <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-12 md:grid-cols-2 md:items-center md:py-20 md:px-6">
-          <div className="space-y-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#cfe3c7] bg-white/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[#2f6a36]">
-              <Leaf className="h-3.5 w-3.5" /> {siteContent.heroEyebrow}
-            </div>
-            <h1 className="text-5xl font-semibold leading-[1.05] tracking-tight md:text-7xl">
-              {siteContent.heroTitle}
+      <section className="mx-auto max-w-7xl px-4 pt-8 md:px-6 md:pt-12">
+        <div className="grid items-center gap-8 md:grid-cols-[1.1fr_1fr]">
+          <div className="space-y-6">
+            <h1 className="font-serif text-5xl font-semibold leading-[1.05] tracking-tight text-[#1f4023] md:text-6xl lg:text-7xl">
+              Comandă online produse proaspete de la Family Garden
             </h1>
             <p className="max-w-xl text-lg leading-8 text-[#516454]">
-              {siteContent.heroSubtitle}
+              Legume, răsaduri și flori cultivate local, cu grijă pentru calitate, prospețime și gust autentic. Vezi rapid ce este disponibil și comandă simplu, online.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/comanda-online">
-                <Button size="lg" className="rounded-full bg-[#4f8f43] px-7 hover:bg-[#3f7a35]">
-                  Vezi produsele <ArrowRight className="ml-2 h-4 w-4" />
+                <Button size="lg" className="rounded-full bg-[#4f8f43] px-7 text-base hover:bg-[#3f7a35]">
+                  <Sprout className="mr-2 h-4 w-4" /> Vezi produsele
                 </Button>
               </Link>
-              <Link href="/contact">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="rounded-full border-[#4f8f43] bg-transparent px-7 text-[#2f6a36] hover:bg-[#eef3ea]"
-                >
-                  Contactează-ne
+              <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer">
+                <Button size="lg" variant="outline" className="rounded-full border-[#4f8f43] bg-transparent px-7 text-base text-[#2f6a36] hover:bg-[#eef3ea]">
+                  <MessageCircle className="mr-2 h-4 w-4" /> Comandă pe WhatsApp
                 </Button>
-              </Link>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-6 pt-2 text-sm text-[#516454]">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-[#4f8f43]" /> Cultivat local
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-[#4f8f43]" /> Fără chimicale agresive
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-[#4f8f43]" /> Livrare locală
-              </div>
+              </a>
             </div>
           </div>
-
           <div className="relative">
             <div className="overflow-hidden rounded-[36px] bg-white shadow-2xl ring-1 ring-black/5">
               <img
-                src={siteContent.images.hero}
-                alt="Family Garden – solar cu plante proaspete"
+                src={siteImages.logo}
+                alt="Family Garden – legume, fructe, flori, răsaduri"
                 className="h-[420px] w-full object-cover md:h-[520px]"
               />
             </div>
-            <div className="absolute -bottom-6 -left-6 hidden rounded-3xl bg-white p-5 shadow-xl ring-1 ring-black/5 md:block">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef3ea]">
-                  <Star className="h-6 w-6 fill-[#f5b301] text-[#f5b301]" />
+          </div>
+        </div>
+
+        {/* TRUST STRIP */}
+        <div className="mt-10 rounded-[28px] bg-white p-3 shadow-sm ring-1 ring-[#e3ebde] md:p-4">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+            {trustItems.map((t) => (
+              <div key={t.label} className="flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium text-[#2a4430]">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef3ea] text-[#2f6a36]">
+                  <t.icon className="h-4 w-4" />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold">Recomandat de familii din Alba</p>
-                  <p className="text-xs text-[#5b7a5f]">Calitate de la producător</p>
-                </div>
+                <span>{t.label}</span>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* STATS */}
-      <section className="mx-auto max-w-7xl px-4 pb-10 md:px-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          {siteContent.stats.map((stat) => (
+      {/* WHY US */}
+      <section className="mx-auto max-w-7xl px-4 py-16 md:px-6">
+        <h2 className="text-center font-serif text-3xl font-semibold tracking-tight md:text-5xl">
+          De ce să alegi Family Garden
+        </h2>
+        <div className="mt-10 grid gap-5 md:grid-cols-3">
+          {whyItems.map((w) => (
             <div
-              key={stat.label}
-              className="rounded-3xl bg-white p-7 shadow-sm ring-1 ring-[#e3ebde]"
+              key={w.title}
+              className="flex items-center gap-5 rounded-3xl bg-[#eef3ea] p-7 ring-1 ring-[#d8e3d4]"
             >
-              <p className="text-5xl font-semibold tracking-tight text-[#2f6a36]">{stat.value}</p>
-              <p className="mt-2 text-[#516454]">{stat.label}</p>
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white text-[#2f6a36] shadow-sm">
+                <w.icon className="h-7 w-7" />
+              </div>
+              <div>
+                <h3 className="font-serif text-xl font-semibold text-[#1f4023]">{w.title}</h3>
+                <p className="mt-1 text-sm leading-6 text-[#516454]">{w.text}</p>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* STORY */}
-      <section className="mx-auto max-w-7xl px-4 py-16 md:px-6">
-        <div className="grid items-center gap-10 md:grid-cols-2">
-          <div className="space-y-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#5b7a5f]">
-              {siteContent.storyEyebrow}
-            </p>
-            <h2 className="text-4xl font-semibold tracking-tight md:text-5xl">
-              {siteContent.storyTitle}
-            </h2>
-            <p className="text-lg leading-8 text-[#516454]">{siteContent.storyText}</p>
-            <ul className="space-y-3 pt-2">
-              {siteContent.storyPoints.map((point) => (
-                <li key={point} className="flex items-start gap-3 text-[#2a4430]">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#4f8f43]" />
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="overflow-hidden rounded-[36px] bg-white shadow-xl ring-1 ring-black/5">
-            <img
-              src={siteContent.images.solar}
-              alt="Solar Family Garden"
-              className="h-[420px] w-full object-cover md:h-[520px]"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* BENEFITS */}
-      <section className="mx-auto max-w-7xl px-4 py-10 md:px-6">
-        <div className="grid gap-6 md:grid-cols-3">
-          {siteContent.benefits.map((b) => {
-            const Icon = iconMap[b.icon] || Sprout;
+      {/* FEATURED PRODUCTS */}
+      <section className="mx-auto max-w-7xl px-4 pb-10 md:px-6">
+        <h2 className="text-center font-serif text-3xl font-semibold tracking-tight md:text-5xl">
+          Produse recomandate în acest sezon
+        </h2>
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {featured.map((product) => {
+            const sb = stockBadge(product);
             return (
-              <div key={b.title} className="rounded-3xl bg-white p-7 shadow-sm ring-1 ring-[#e3ebde]">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef3ea] text-[#2f6a36]">
-                  <Icon className="h-6 w-6" />
+              <Link
+                key={product.id}
+                href={`/produs/${product.id}`}
+                className="group flex flex-col rounded-[24px] bg-white p-3 shadow-sm ring-1 ring-[#e3ebde] transition hover:-translate-y-1 hover:shadow-lg"
+              >
+                <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-[#eef3ea]">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
                 </div>
-                <h3 className="mt-4 text-xl font-semibold">{b.title}</h3>
-                <p className="mt-2 leading-7 text-[#516454]">{b.text}</p>
-              </div>
+                <div className="flex flex-1 flex-col px-1 pt-4">
+                  <h3 className="font-serif text-xl font-semibold leading-tight">{product.name}</h3>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-lg font-bold text-[#1f4023]">{product.price.toFixed(2)} lei</span>
+                    <span className="text-sm text-[#5b7a5f]">/ {product.unit.split(" / ")[1] || "buc"}</span>
+                  </div>
+                  <span className={`mt-2 inline-flex w-fit items-center rounded-full px-3 py-0.5 text-xs font-semibold ${sb.cls}`}>
+                    {sb.label}
+                  </span>
+                  <span className="mt-3 inline-flex items-center justify-center gap-2 rounded-full bg-[#4f8f43] px-4 py-2 text-sm font-semibold text-white group-hover:bg-[#3f7a35]">
+                    <ShoppingCart className="h-4 w-4" /> Adaugă în coș
+                  </span>
+                </div>
+              </Link>
             );
           })}
         </div>
       </section>
 
-      {/* FEATURED PRODUCTS */}
-      <section className="mx-auto max-w-7xl px-4 py-16 md:px-6">
-        <div className="mb-8 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#5b7a5f]">Ce oferim</p>
-            <h2 className="mt-1 text-4xl font-semibold tracking-tight md:text-5xl">Produsele noastre</h2>
+      {/* PRODUCTS LIST PREVIEW */}
+      <section className="mx-auto max-w-7xl px-4 py-10 md:px-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <h2 className="font-serif text-3xl font-semibold tracking-tight md:text-4xl">Produsele noastre</h2>
+          <div className="flex flex-wrap gap-2">
+            {productCategories.slice(0, 4).map((c, i) => (
+              <Link
+                key={c}
+                href="/comanda-online"
+                className={`rounded-full px-4 py-1.5 text-sm font-medium ${
+                  i === 0 ? "bg-[#4f8f43] text-white" : "border border-[#d8e3d4] bg-white text-[#2a4430]"
+                }`}
+              >
+                {c}
+              </Link>
+            ))}
           </div>
-          <Link
-            href="/comanda-online"
-            className="hidden items-center gap-1 text-sm font-semibold text-[#2f6a36] hover:text-[#1f4023] md:inline-flex"
-          >
-            Vezi toate <ArrowRight className="h-4 w-4" />
-          </Link>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {featured.map((product) => (
-            <Link
-              key={product.id}
-              href={`/produs/${product.id}`}
-              className="group rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-[#e3ebde] transition hover:-translate-y-1 hover:shadow-lg"
-            >
-              <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-[#eef3ea]">
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                />
-              </div>
-              <div className="pt-5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#5b7a5f]">
-                  {product.category}
-                </p>
-                <h3 className="mt-1 text-xl font-semibold">{product.name}</h3>
-                <p className="mt-2 line-clamp-2 text-sm text-[#516454]">{product.description}</p>
-                <div className="mt-5 flex items-center justify-between">
-                  <div>
-                    <p className="text-2xl font-semibold">{product.price.toFixed(2)} lei</p>
-                    <p className="text-xs text-[#5b7a5f]">{product.unit}</p>
-                  </div>
-                  <span className="rounded-full bg-[#4f8f43] px-4 py-2 text-sm font-medium text-white group-hover:bg-[#3f7a35]">
-                    Vezi
-                  </span>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {products.slice(0, 6).map((p) => {
+            const sb = stockBadge(p);
+            return (
+              <Link
+                key={p.id}
+                href={`/produs/${p.id}`}
+                className="flex gap-4 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-[#e3ebde] transition hover:shadow-md"
+              >
+                <div className="h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-[#eef3ea]">
+                  <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
                 </div>
-              </div>
-            </Link>
-          ))}
+                <div className="flex flex-1 flex-col justify-center pr-2">
+                  <h3 className="font-serif text-lg font-semibold leading-tight">{p.name}</h3>
+                  <p className="mt-1 text-xs text-[#5b7a5f]">Sezon: {p.season}</p>
+                  <p className="text-xs text-[#5b7a5f]">Disponibil: {p.stock}</p>
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <p className="text-base font-bold text-[#1f4023]">{p.price.toFixed(2)} lei</p>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${sb.cls}`}>{sb.label}</span>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
-
-        <div className="mt-10 text-center md:hidden">
+        <div className="mt-8 text-center">
           <Link href="/comanda-online">
-            <Button variant="outline" className="rounded-full border-[#4f8f43] text-[#2f6a36]">
-              Vezi toate produsele
+            <Button size="lg" className="rounded-full bg-[#4f8f43] px-8 hover:bg-[#3f7a35]">
+              Vezi toate produsele <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="mx-auto max-w-7xl px-4 pb-16 md:px-6">
-        <div className="overflow-hidden rounded-[40px] bg-gradient-to-br from-[#2f6a36] to-[#4f8f43] p-10 text-white shadow-xl md:p-16">
-          <div className="grid gap-6 md:grid-cols-[1.5fr_1fr] md:items-center">
-            <div>
-              <h2 className="text-3xl font-semibold tracking-tight md:text-5xl">
-                Comandă acum și savurează prospețimea grădinii noastre
-              </h2>
-              <p className="mt-4 max-w-xl leading-8 text-white/85">
-                Plasează comanda online în câteva minute. Te contactăm telefonic pentru confirmare și livrăm local proaspăt.
+      {/* BOTTOM CTA CARDS */}
+      <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
+        <div className="grid gap-5 md:grid-cols-3">
+          <a
+            href={WHATSAPP_LINK}
+            target="_blank"
+            rel="noreferrer"
+            className="group flex items-center gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#e3ebde] transition hover:-translate-y-1 hover:shadow-md"
+          >
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#25d366] text-white">
+              <MessageCircle className="h-6 w-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-serif text-xl font-semibold">Comandă rapidă</h3>
+              <p className="mt-1 text-sm text-[#516454]">Scrie-ne pe WhatsApp și ți-i răspundem rapid la orice întrebare.</p>
+              <p className="mt-2 inline-flex items-center text-sm font-semibold text-[#2f6a36] group-hover:underline">
+                Comandă pe WhatsApp <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row md:flex-col md:justify-self-end">
-              <Link href="/comanda-online">
-                <Button size="lg" className="w-full rounded-full bg-white text-[#1f4023] hover:bg-white/90">
-                  Comandă online <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <a href="tel:0749476386">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="w-full rounded-full border-white/40 bg-transparent text-white hover:bg-white/10"
-                >
-                  Sună: 0749 476 386
-                </Button>
-              </a>
+          </a>
+
+          <Link
+            href="/contact"
+            className="group flex items-center gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#e3ebde] transition hover:-translate-y-1 hover:shadow-md"
+          >
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#eef3ea] text-[#2f6a36]">
+              <Truck className="h-6 w-6" />
             </div>
-          </div>
+            <div className="flex-1">
+              <h3 className="font-serif text-xl font-semibold">Livrare locală</h3>
+              <p className="mt-1 text-sm text-[#516454]">Livrăm cu grijă, rapid și în siguranță în zona ta.</p>
+              <p className="mt-2 inline-flex items-center text-sm font-semibold text-[#2f6a36] group-hover:underline">
+                Vezi zona de livrare <ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </p>
+            </div>
+          </Link>
+
+          <Link
+            href="/comanda-online"
+            className="group flex items-center gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#e3ebde] transition hover:-translate-y-1 hover:shadow-md"
+          >
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#eef3ea] text-[#2f6a36]">
+              <Sprout className="h-6 w-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-serif text-xl font-semibold">Produse de sezon</h3>
+              <p className="mt-1 text-sm text-[#516454]">Prospețime garantată, direct din grădina noastră, la momentul potrivit.</p>
+              <p className="mt-2 inline-flex items-center text-sm font-semibold text-[#2f6a36] group-hover:underline">
+                Vezi produsele de sezon <ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </p>
+            </div>
+          </Link>
         </div>
       </section>
     </div>

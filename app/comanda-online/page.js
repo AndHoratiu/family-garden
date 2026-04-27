@@ -43,17 +43,29 @@ const ComandaOnlinePage = () => {
     notes: "",
   });
 
-  // Hydrate cart from localStorage (e.g. when redirected from product detail page)
+  // Hydrate cart from localStorage (initial + redirect from product detail)
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const stored = JSON.parse(localStorage.getItem("fg_pending_cart") || "{}");
-      if (stored && Object.keys(stored).length > 0) {
-        setCart((prev) => ({ ...prev, ...stored }));
-        localStorage.removeItem("fg_pending_cart");
+      const persisted = JSON.parse(localStorage.getItem("fg_cart") || "{}");
+      const pending = JSON.parse(localStorage.getItem("fg_pending_cart") || "{}");
+      const merged = { ...persisted };
+      for (const [k, v] of Object.entries(pending)) {
+        merged[k] = (merged[k] || 0) + Number(v || 0);
       }
+      if (Object.keys(merged).length > 0) setCart(merged);
+      if (Object.keys(pending).length > 0) localStorage.removeItem("fg_pending_cart");
     } catch {}
   }, []);
+
+  // Persist cart to localStorage and notify header badge
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem("fg_cart", JSON.stringify(cart));
+      window.dispatchEvent(new Event("fg-cart-changed"));
+    } catch {}
+  }, [cart]);
 
   const visibleProducts = useMemo(() => {
     return products.filter((product) => {
@@ -153,6 +165,11 @@ const ComandaOnlinePage = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Eroare la plasarea comenzii");
+      // Clear cart on success
+      try {
+        localStorage.setItem("fg_cart", "{}");
+        window.dispatchEvent(new Event("fg-cart-changed"));
+      } catch {}
       toast.success("Comanda a fost plasată cu succes!");
       router.push(`/succes?order=${data.orderId}`);
     } catch (err) {
@@ -165,7 +182,7 @@ const ComandaOnlinePage = () => {
     <div className="mx-auto max-w-7xl px-4 py-10 md:px-6">
       <div className="mb-10 space-y-3">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#5b7a5f]">Comandă online</p>
-        <h1 className="text-4xl font-semibold tracking-tight md:text-6xl">Produse și disponibilitate</h1>
+        <h1 className="font-serif text-4xl font-semibold tracking-tight md:text-6xl">Produse și disponibilitate</h1>
         <p className="max-w-3xl text-lg leading-8 text-[#516454]">
           Vezi produsele disponibile, alege cantitatea dorită și finalizează comanda online. Te contactăm telefonic pentru confirmare.
         </p>
@@ -210,25 +227,33 @@ const ComandaOnlinePage = () => {
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {visibleProducts.map((product) => {
                 const inCart = cart[product.id] || 0;
-                const isLow = product.stock <= 10;
+                const out = product.stock === 0;
+                const low = product.stock > 0 && product.stock <= 10;
+                const stockBadge = out
+                  ? { label: "Indisponibil", cls: "bg-red-100 text-red-700" }
+                  : low
+                  ? { label: "Stoc limitat", cls: "bg-amber-100 text-amber-700" }
+                  : { label: "În stoc", cls: "bg-emerald-100 text-emerald-700" };
                 return (
                   <article
                     key={product.id}
                     className="flex flex-col rounded-[24px] bg-white p-3 shadow-sm ring-1 ring-[#e3ebde] transition hover:shadow-md"
                   >
                     <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-[#eef3ea]">
-                      <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
-                      {isLow && (
-                        <Badge className="absolute left-3 top-3 rounded-full bg-[#f59e0b] hover:bg-[#f59e0b]">
-                          Stoc limitat
-                        </Badge>
-                      )}
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className={`h-full w-full object-cover ${out ? "opacity-50" : ""}`}
+                      />
+                      <span className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-semibold ${stockBadge.cls}`}>
+                        {stockBadge.label}
+                      </span>
                     </div>
                     <div className="flex flex-1 flex-col px-2 pt-4">
                       <p className="text-xs font-semibold uppercase tracking-wider text-[#5b7a5f]">
                         {product.category}
                       </p>
-                      <h2 className="mt-1 text-lg font-semibold leading-snug">{product.name}</h2>
+                      <h2 className="mt-1 font-serif text-xl font-semibold leading-snug">{product.name}</h2>
                       <p className="mt-1.5 line-clamp-2 text-sm text-[#516454]">{product.description}</p>
                       <div className="mt-2 flex items-center gap-3 text-xs text-[#5b7a5f]">
                         <span>Sezon: {product.season}</span>
@@ -237,10 +262,14 @@ const ComandaOnlinePage = () => {
                       </div>
                       <div className="mt-auto flex items-center justify-between pt-4">
                         <div>
-                          <p className="text-xl font-semibold">{product.price.toFixed(2)} lei</p>
+                          <p className="text-xl font-bold text-[#1f4023]">{product.price.toFixed(2)} lei</p>
                           <p className="text-xs text-[#5b7a5f]">{product.unit}</p>
                         </div>
-                        {inCart > 0 ? (
+                        {out ? (
+                          <Button disabled className="rounded-full bg-gray-200 text-gray-500 cursor-not-allowed">
+                            Indisponibil
+                          </Button>
+                        ) : inCart > 0 ? (
                           <div className="flex items-center gap-1 rounded-full bg-[#eef3ea] p-1">
                             <button
                               onClick={() => updateQty(product.id, -1)}

@@ -1,8 +1,22 @@
+import { Inter, Playfair_Display } from "next/font/google";
 import "@/app/globals.css";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import WhatsAppButton from "@/components/whatsapp-button";
 import { Toaster } from "@/components/ui/sonner";
+
+const inter = Inter({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-playfair",
+  display: "swap",
+  weight: ["400", "500", "600", "700", "800"],
+});
 
 export const metadata = {
   metadataBase: new URL("https://family-garden.ro"),
@@ -11,7 +25,7 @@ export const metadata = {
     template: "%s | Family Garden",
   },
   description:
-    "Family Garden – legume, fructe, flori și răsaduri cultivate cu dragoste în Vințu de Jos, Alba. Comandă online direct de la producător, livrare locală. 10+ ani experiență, 500+ soiuri.",
+    "Family Garden – legume, fructe, flori și răsaduri cultivate cu dragoste în Vințu de Jos, Alba. Comandă online direct de la producător, livrare locală.",
   keywords: [
     "legume proaspete",
     "răsaduri",
@@ -36,34 +50,20 @@ export const metadata = {
     siteName: "Family Garden",
     locale: "ro_RO",
     type: "website",
-    images: [
-      {
-        url: "https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg",
-        width: 1200,
-        height: 630,
-        alt: "Family Garden",
-      },
-    ],
+    images: [{ url: "https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg", width: 1200, height: 630, alt: "Family Garden" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Family Garden – Natură proaspătă pentru acasă",
-    description:
-      "Legume, fructe, flori și răsaduri cultivate local. Comandă online direct de la producător.",
+    description: "Legume, fructe, flori și răsaduri cultivate local. Comandă online direct de la producător.",
     images: ["https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg"],
   },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: { index: true, follow: true },
-  },
-  icons: {
-    icon: "/favicon.ico",
-  },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
+  icons: { icon: "/favicon.ico" },
 };
 
 export const viewport = {
-  themeColor: "#4f8f43",
+  themeColor: "#2f6a36",
   width: "device-width",
   initialScale: 1,
 };
@@ -74,8 +74,7 @@ const App = ({ children }) => {
     "@type": "LocalBusiness",
     name: "Family Garden",
     image: "https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg",
-    description:
-      "Legume, fructe, flori și răsaduri cultivate local în Vințu de Jos, Alba.",
+    description: "Legume, fructe, flori și răsaduri cultivate local în Vințu de Jos, Alba.",
     address: {
       "@type": "PostalAddress",
       streetAddress: "Telman, nr. 46",
@@ -90,15 +89,12 @@ const App = ({ children }) => {
   };
 
   return (
-    <html lang="ro">
+    <html lang="ro" className={`${inter.variable} ${playfair.variable}`}>
       <head>
         <link rel="preconnect" href="https://andhoratiu.github.io" />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson) }}
-        />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson) }} />
       </head>
-      <body className="min-h-screen bg-[#f8f6f1] text-[#1f4023] antialiased">
+      <body className="min-h-screen bg-[#f8f5ed] font-sans text-[#1f4023] antialiased">
         <SiteHeader />
         <main>{children}</main>
         <SiteFooter />
