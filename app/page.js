@@ -81,9 +81,9 @@ const HomePage = () => {
           <div className="relative">
             <div className="overflow-hidden rounded-[36px] bg-white shadow-2xl ring-1 ring-black/5">
               <img
-                src={siteImages.logo}
-                alt="Family Garden – legume, fructe, flori, răsaduri"
-                className="h-[420px] w-full object-cover md:h-[520px]"
+                src={siteContent.images.hero}
+                alt="Family Garden – legume, fructe, flori, răsaduri proaspete"
+                className="h-[420px] w-full object-cover md:h-[560px]"
               />
             </div>
           </div>
