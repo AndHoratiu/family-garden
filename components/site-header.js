@@ -8,11 +8,14 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { href: "/", label: "Acasă" },
   { href: "/comanda-online", label: "Comandă online" },
+  { href: "/galerie", label: "Galerie" },
   { href: "/despre-noi", label: "Despre noi" },
   { href: "/contact", label: "Contact" },
 ];
 
 export default function SiteHeader() {
+  const [open, setOpen] = useState(false);
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[#e3ebde] bg-[#f8f6f1]/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-6">
@@ -26,7 +29,7 @@ export default function SiteHeader() {
           </div>
         </Link>
 
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-7 md:flex">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -45,26 +48,20 @@ export default function SiteHeader() {
           </Button>
         </Link>
 
-        <MobileMenu />
+        <div className="md:hidden">
+          <button
+            onClick={() => setOpen(!open)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
+            aria-label="Meniu"
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
-    </header>
-  );
-}
 
-function MobileMenu() {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="md:hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
-        aria-label="Meniu"
-      >
-        {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-2 border-t border-[#e3ebde] bg-[#f8f6f1] px-4 py-4">
-          <div className="flex flex-col gap-3">
+        <div className="border-t border-[#e3ebde] bg-[#f8f6f1] px-4 py-4 md:hidden">
+          <div className="flex flex-col gap-2">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -78,6 +75,6 @@ function MobileMenu() {
           </div>
         </div>
       )}
-    </div>
+    </header>
   );
 }
