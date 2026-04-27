@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
-import { Menu, X, Sprout, ShoppingBasket } from "lucide-react";
+import { Menu, X, ShoppingBasket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { siteContent } from "@/lib/site-content";
 
 const navItems = [
   { href: "/", label: "Acasă" },
@@ -18,12 +20,16 @@ export default function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[#e3ebde] bg-[#f8f6f1]/90 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#4f8f43] text-white">
-            <Sprout className="h-5 w-5" />
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="h-12 w-12 overflow-hidden rounded-full ring-2 ring-[#4f8f43]/30">
+            <img
+              src={siteContent.images.logo}
+              alt="Family Garden"
+              className="h-full w-full object-cover"
+            />
           </div>
-          <div>
+          <div className="hidden sm:block">
             <p className="text-lg font-semibold leading-none text-[#1f4023]">Family Garden</p>
             <p className="text-xs text-[#5b7a5f]">Cultivat cu dragoste</p>
           </div>
@@ -72,6 +78,13 @@ export default function SiteHeader() {
                 {item.label}
               </Link>
             ))}
+            <Link
+              href="/comanda-online"
+              onClick={() => setOpen(false)}
+              className="rounded-2xl bg-[#4f8f43] px-4 py-3 text-center font-semibold text-white"
+            >
+              Comandă online
+            </Link>
           </div>
         </div>
       )}

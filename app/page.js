@@ -168,8 +168,9 @@ const HomePage = () => {
 
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {featured.map((product) => (
-            <article
+            <Link
               key={product.id}
+              href={`/produs/${product.id}`}
               className="group rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-[#e3ebde] transition hover:-translate-y-1 hover:shadow-lg"
             >
               <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-[#eef3ea]">
@@ -190,12 +191,12 @@ const HomePage = () => {
                     <p className="text-2xl font-semibold">{product.price.toFixed(2)} lei</p>
                     <p className="text-xs text-[#5b7a5f]">{product.unit}</p>
                   </div>
-                  <Link href="/comanda-online">
-                    <Button className="rounded-full bg-[#4f8f43] hover:bg-[#3f7a35]">Adaugă</Button>
-                  </Link>
+                  <span className="rounded-full bg-[#4f8f43] px-4 py-2 text-sm font-medium text-white group-hover:bg-[#3f7a35]">
+                    Vezi
+                  </span>
                 </div>
               </div>
-            </article>
+            </Link>
           ))}
         </div>
 

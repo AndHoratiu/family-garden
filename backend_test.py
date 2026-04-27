@@ -1,466 +1,403 @@
 #!/usr/bin/env python3
-"""
-Family Garden Backend API Testing
-Tests all backend endpoints for the Family Garden e-commerce application.
-"""
 
 import requests
 import json
 import sys
 from datetime import datetime
 
-# Base URL from environment
-BASE_URL = "https://fresh-harvest-152.preview.emergentagent.com"
-API_BASE = f"{BASE_URL}/api"
+# Configuration
+BASE_URL = "https://fresh-harvest-152.preview.emergentagent.com/api"
+ADMIN_PASSWORD = "familygarden2025"
 
-class TestResults:
-    def __init__(self):
-        self.passed = 0
-        self.failed = 0
-        self.results = []
-    
-    def add_result(self, test_name, passed, message=""):
-        self.results.append({
-            "test": test_name,
-            "passed": passed,
-            "message": message
-        })
-        if passed:
-            self.passed += 1
-            print(f"✅ {test_name}: PASSED {message}")
-        else:
-            self.failed += 1
-            print(f"❌ {test_name}: FAILED {message}")
-    
-    def summary(self):
-        total = self.passed + self.failed
-        print(f"\n{'='*60}")
-        print(f"TEST SUMMARY: {self.passed}/{total} tests passed")
-        print(f"{'='*60}")
-        return self.failed == 0
+def log_test(test_name, success, details=""):
+    """Log test results"""
+    status = "✅ PASS" if success else "❌ FAIL"
+    print(f"{status}: {test_name}")
+    if details:
+        print(f"   Details: {details}")
+    print()
 
-def test_health_endpoints():
-    """Test 1: Health check endpoints"""
-    results = TestResults()
+def test_admin_login():
+    """Test POST /api/admin/login endpoint"""
+    print("=== Testing Admin Login (POST /api/admin/login) ===")
     
+    # Test 1: Valid password
     try:
-        # Test GET /api
-        print("\n🔍 Testing GET /api...")
-        response = requests.get(f"{API_BASE}", timeout=10)
+        response = requests.post(f"{BASE_URL}/admin/login", 
+                               json={"password": "familygarden2025"},
+                               timeout=10)
+        
         if response.status_code == 200:
             data = response.json()
-            if data.get("ok") == True and data.get("service") == "Family Garden API":
-                results.add_result("GET /api", True, f"Response: {data}")
+            if data.get("token") == "familygarden2025":
+                log_test("Valid password login", True, f"Response: {data}")
             else:
-                results.add_result("GET /api", False, f"Unexpected response: {data}")
+                log_test("Valid password login", False, f"Expected token 'familygarden2025', got: {data}")
         else:
-            results.add_result("GET /api", False, f"Status: {response.status_code}, Body: {response.text}")
+            log_test("Valid password login", False, f"Status: {response.status_code}, Response: {response.text}")
     except Exception as e:
-        results.add_result("GET /api", False, f"Exception: {str(e)}")
+        log_test("Valid password login", False, f"Exception: {str(e)}")
     
+    # Test 2: Invalid password
     try:
-        # Test GET /api/health
-        print("\n🔍 Testing GET /api/health...")
-        response = requests.get(f"{API_BASE}/health", timeout=10)
-        if response.status_code == 200:
+        response = requests.post(f"{BASE_URL}/admin/login", 
+                               json={"password": "wrong"},
+                               timeout=10)
+        
+        if response.status_code == 401:
             data = response.json()
-            if data.get("status") == "ok":
-                results.add_result("GET /api/health", True, f"Response: {data}")
-            else:
-                results.add_result("GET /api/health", False, f"Unexpected response: {data}")
+            log_test("Invalid password login", True, f"Correctly returned 401: {data}")
         else:
-            results.add_result("GET /api/health", False, f"Status: {response.status_code}, Body: {response.text}")
+            log_test("Invalid password login", False, f"Expected 401, got {response.status_code}: {response.text}")
     except Exception as e:
-        results.add_result("GET /api/health", False, f"Exception: {str(e)}")
+        log_test("Invalid password login", False, f"Exception: {str(e)}")
     
-    return results
+    # Test 3: Empty body
+    try:
+        response = requests.post(f"{BASE_URL}/admin/login", 
+                               json={},
+                               timeout=10)
+        
+        if response.status_code == 401:
+            data = response.json()
+            log_test("Empty body login", True, f"Correctly returned 401: {data}")
+        else:
+            log_test("Empty body login", False, f"Expected 401, got {response.status_code}: {response.text}")
+    except Exception as e:
+        log_test("Empty body login", False, f"Exception: {str(e)}")
 
-def test_create_order_happy_path():
-    """Test 2: Create order - happy path with 'Livrare locală'"""
-    results = TestResults()
+def create_test_order():
+    """Create a test order for admin operations"""
+    print("=== Creating Test Order ===")
     
     order_data = {
-        "customerName": "Ion Popescu",
-        "customerPhone": "0749476386",
-        "customerEmail": "ion@example.ro",
-        "customerAddress": "Strada Florilor 10, Alba Iulia",
-        "notes": "Sunați înainte de livrare",
+        "customerName": "Maria Popescu",
+        "customerPhone": "0721234567",
+        "customerEmail": "maria@example.com",
+        "customerAddress": "Str. Florilor 123, Vințu de Jos",
         "deliveryMethod": "Livrare locală",
         "paymentMethod": "Ramburs",
         "items": [
-            {"id": "rosii-gradina", "name": "Roșii de grădină", "price": 8, "quantity": 2, "unit": "lei / kg"},
-            {"id": "zmeura", "name": "Zmeură proaspătă", "price": 16, "quantity": 1, "unit": "lei / caserolă"}
+            {"id": "1", "name": "Roșii", "price": 8, "quantity": 2, "unit": "kg"},
+            {"id": "2", "name": "Castraveți", "price": 6, "quantity": 1, "unit": "kg"}
         ]
     }
     
     try:
-        print("\n🔍 Testing POST /api/orders (happy path with Livrare locală)...")
-        response = requests.post(
-            f"{API_BASE}/orders",
-            json=order_data,
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
+        response = requests.post(f"{BASE_URL}/orders", json=order_data, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            order_id = data.get("orderId")
+            log_test("Test order creation", True, f"Created order with ID: {order_id}")
+            return order_id
+        else:
+            log_test("Test order creation", False, f"Status: {response.status_code}, Response: {response.text}")
+            return None
+    except Exception as e:
+        log_test("Test order creation", False, f"Exception: {str(e)}")
+        return None
+
+def test_admin_orders():
+    """Test GET /api/admin/orders endpoint"""
+    print("=== Testing Admin Orders List (GET /api/admin/orders) ===")
+    
+    # Test 1: Valid Bearer token
+    try:
+        headers = {"Authorization": f"Bearer {ADMIN_PASSWORD}"}
+        response = requests.get(f"{BASE_URL}/admin/orders", headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
+            orders = data.get("orders", [])
+            stats = data.get("stats", {})
             
-            # Check required fields in response
-            required_fields = ["orderId", "orderNumber", "order"]
-            missing_fields = [f for f in required_fields if f not in data]
-            if missing_fields:
-                results.add_result("POST /api/orders - response structure", False, f"Missing fields: {missing_fields}")
-                return results, None
-            
-            # Validate orderId is UUID format
-            order_id = data["orderId"]
-            if len(order_id) != 36 or order_id.count('-') != 4:
-                results.add_result("POST /api/orders - orderId format", False, f"Invalid UUID format: {order_id}")
+            # Verify response structure
+            if "orders" in data and "stats" in data:
+                # Verify stats calculations
+                total_matches = stats.get("total") == len(orders)
+                new_count = len([o for o in orders if o.get("orderStatus") == "new"])
+                new_matches = stats.get("new") == new_count
+                delivered_orders = [o for o in orders if o.get("orderStatus") == "delivered"]
+                revenue = sum(o.get("total", 0) for o in delivered_orders)
+                revenue_matches = stats.get("revenue") == revenue
+                
+                if total_matches and new_matches and revenue_matches:
+                    log_test("Valid Bearer token - orders list", True, 
+                           f"Orders: {len(orders)}, Stats: {stats}")
+                else:
+                    log_test("Valid Bearer token - orders list", False, 
+                           f"Stats mismatch - total:{total_matches}, new:{new_matches}, revenue:{revenue_matches}")
             else:
-                results.add_result("POST /api/orders - orderId format", True, f"Valid UUID: {order_id}")
-            
-            # Validate orderNumber starts with "FG"
-            order_number = data["orderNumber"]
-            if order_number.startswith("FG") and len(order_number) == 8:
-                results.add_result("POST /api/orders - orderNumber format", True, f"Valid format: {order_number}")
-            else:
-                results.add_result("POST /api/orders - orderNumber format", False, f"Invalid format: {order_number}")
-            
-            # Validate order calculations
-            order = data["order"]
-            expected_subtotal = 2 * 8 + 1 * 16  # 32
-            expected_delivery_fee = 15  # Livrare locală
-            expected_total = expected_subtotal + expected_delivery_fee  # 47
-            
-            if order.get("subtotal") == expected_subtotal:
-                results.add_result("POST /api/orders - subtotal calculation", True, f"Correct: {expected_subtotal}")
-            else:
-                results.add_result("POST /api/orders - subtotal calculation", False, f"Expected {expected_subtotal}, got {order.get('subtotal')}")
-            
-            if order.get("deliveryFee") == expected_delivery_fee:
-                results.add_result("POST /api/orders - delivery fee", True, f"Correct: {expected_delivery_fee}")
-            else:
-                results.add_result("POST /api/orders - delivery fee", False, f"Expected {expected_delivery_fee}, got {order.get('deliveryFee')}")
-            
-            if order.get("total") == expected_total:
-                results.add_result("POST /api/orders - total calculation", True, f"Correct: {expected_total}")
-            else:
-                results.add_result("POST /api/orders - total calculation", False, f"Expected {expected_total}, got {order.get('total')}")
-            
-            # Validate order status fields
-            if order.get("paymentStatus") == "pending":
-                results.add_result("POST /api/orders - paymentStatus", True, "Correct: pending")
-            else:
-                results.add_result("POST /api/orders - paymentStatus", False, f"Expected 'pending', got {order.get('paymentStatus')}")
-            
-            if order.get("orderStatus") == "new":
-                results.add_result("POST /api/orders - orderStatus", True, "Correct: new")
-            else:
-                results.add_result("POST /api/orders - orderStatus", False, f"Expected 'new', got {order.get('orderStatus')}")
-            
-            # Validate createdAt is ISO string
-            created_at = order.get("createdAt")
-            if created_at and "T" in created_at and created_at.endswith("Z"):
-                results.add_result("POST /api/orders - createdAt format", True, f"Valid ISO format: {created_at}")
-            else:
-                results.add_result("POST /api/orders - createdAt format", False, f"Invalid ISO format: {created_at}")
-            
-            results.add_result("POST /api/orders - overall", True, "Order created successfully")
-            return results, order_id
-            
+                log_test("Valid Bearer token - orders list", False, f"Missing orders or stats in response: {data}")
         else:
-            results.add_result("POST /api/orders - overall", False, f"Status: {response.status_code}, Body: {response.text}")
-            return results, None
-            
+            log_test("Valid Bearer token - orders list", False, f"Status: {response.status_code}, Response: {response.text}")
     except Exception as e:
-        results.add_result("POST /api/orders - overall", False, f"Exception: {str(e)}")
-        return results, None
+        log_test("Valid Bearer token - orders list", False, f"Exception: {str(e)}")
+    
+    # Test 2: No Authorization header
+    try:
+        response = requests.get(f"{BASE_URL}/admin/orders", timeout=10)
+        
+        if response.status_code == 401:
+            log_test("No Authorization header", True, f"Correctly returned 401: {response.json()}")
+        else:
+            log_test("No Authorization header", False, f"Expected 401, got {response.status_code}: {response.text}")
+    except Exception as e:
+        log_test("No Authorization header", False, f"Exception: {str(e)}")
+    
+    # Test 3: Invalid token
+    try:
+        headers = {"Authorization": "Bearer invalid_token"}
+        response = requests.get(f"{BASE_URL}/admin/orders", headers=headers, timeout=10)
+        
+        if response.status_code == 401:
+            log_test("Invalid token", True, f"Correctly returned 401: {response.json()}")
+        else:
+            log_test("Invalid token", False, f"Expected 401, got {response.status_code}: {response.text}")
+    except Exception as e:
+        log_test("Invalid token", False, f"Exception: {str(e)}")
 
-def test_create_order_pickup():
-    """Test 3: Create order with 'Ridicare personală' - delivery fee should be 0"""
-    results = TestResults()
-    
-    order_data = {
-        "customerName": "Maria Ionescu",
-        "customerPhone": "0756123456",
-        "customerEmail": "maria@example.ro",
-        "customerAddress": "",
-        "notes": "Ridicare personală",
-        "deliveryMethod": "Ridicare personală",
-        "paymentMethod": "Ramburs",
-        "items": [
-            {"id": "castraveti", "name": "Castraveți proaspeți", "price": 10, "quantity": 2, "unit": "lei / kg"}
-        ]
-    }
-    
-    try:
-        print("\n🔍 Testing POST /api/orders (Ridicare personală - zero delivery fee)...")
-        response = requests.post(
-            f"{API_BASE}/orders",
-            json=order_data,
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            order = data["order"]
-            
-            expected_subtotal = 2 * 10  # 20
-            expected_delivery_fee = 0  # Ridicare personală
-            expected_total = expected_subtotal + expected_delivery_fee  # 20
-            
-            if order.get("deliveryFee") == expected_delivery_fee:
-                results.add_result("POST /api/orders - pickup delivery fee", True, f"Correct: {expected_delivery_fee}")
-            else:
-                results.add_result("POST /api/orders - pickup delivery fee", False, f"Expected {expected_delivery_fee}, got {order.get('deliveryFee')}")
-            
-            if order.get("total") == expected_total:
-                results.add_result("POST /api/orders - pickup total", True, f"Correct: {expected_total}")
-            else:
-                results.add_result("POST /api/orders - pickup total", False, f"Expected {expected_total}, got {order.get('total')}")
-            
-            results.add_result("POST /api/orders - pickup overall", True, "Pickup order created successfully")
-            
-        else:
-            results.add_result("POST /api/orders - pickup overall", False, f"Status: {response.status_code}, Body: {response.text}")
-            
-    except Exception as e:
-        results.add_result("POST /api/orders - pickup overall", False, f"Exception: {str(e)}")
-    
-    return results
-
-def test_validation_errors():
-    """Test 4: Validation errors (400)"""
-    results = TestResults()
-    
-    # Test missing customerName
-    try:
-        print("\n🔍 Testing POST /api/orders (missing customerName)...")
-        invalid_data = {
-            "customerPhone": "0749476386",
-            "items": [{"id": "test", "name": "Test", "price": 10, "quantity": 1}]
-        }
-        response = requests.post(
-            f"{API_BASE}/orders",
-            json=invalid_data,
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
-        
-        if response.status_code == 400:
-            results.add_result("POST /api/orders - missing customerName", True, f"Correctly returned 400: {response.json()}")
-        else:
-            results.add_result("POST /api/orders - missing customerName", False, f"Expected 400, got {response.status_code}")
-    except Exception as e:
-        results.add_result("POST /api/orders - missing customerName", False, f"Exception: {str(e)}")
-    
-    # Test missing customerPhone
-    try:
-        print("\n🔍 Testing POST /api/orders (missing customerPhone)...")
-        invalid_data = {
-            "customerName": "Test User",
-            "items": [{"id": "test", "name": "Test", "price": 10, "quantity": 1}]
-        }
-        response = requests.post(
-            f"{API_BASE}/orders",
-            json=invalid_data,
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
-        
-        if response.status_code == 400:
-            results.add_result("POST /api/orders - missing customerPhone", True, f"Correctly returned 400: {response.json()}")
-        else:
-            results.add_result("POST /api/orders - missing customerPhone", False, f"Expected 400, got {response.status_code}")
-    except Exception as e:
-        results.add_result("POST /api/orders - missing customerPhone", False, f"Exception: {str(e)}")
-    
-    # Test empty items array
-    try:
-        print("\n🔍 Testing POST /api/orders (empty items array)...")
-        invalid_data = {
-            "customerName": "Test User",
-            "customerPhone": "0749476386",
-            "items": []
-        }
-        response = requests.post(
-            f"{API_BASE}/orders",
-            json=invalid_data,
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
-        
-        if response.status_code == 400:
-            results.add_result("POST /api/orders - empty items", True, f"Correctly returned 400: {response.json()}")
-        else:
-            results.add_result("POST /api/orders - empty items", False, f"Expected 400, got {response.status_code}")
-    except Exception as e:
-        results.add_result("POST /api/orders - empty items", False, f"Exception: {str(e)}")
-    
-    return results
-
-def test_get_single_order(order_id):
-    """Test 5: GET single order"""
-    results = TestResults()
+def test_admin_update_order(order_id):
+    """Test PATCH /api/admin/orders/:id endpoint"""
+    print(f"=== Testing Admin Update Order (PATCH /api/admin/orders/{order_id}) ===")
     
     if not order_id:
-        results.add_result("GET /api/orders/:id - setup", False, "No order ID available from previous test")
-        return results
+        log_test("Admin update order", False, "No order ID available for testing")
+        return
     
+    headers = {"Authorization": f"Bearer {ADMIN_PASSWORD}"}
+    
+    # Test 1: Update orderStatus to confirmed
     try:
-        print(f"\n🔍 Testing GET /api/orders/{order_id}...")
-        response = requests.get(f"{API_BASE}/orders/{order_id}", timeout=10)
+        update_data = {"orderStatus": "confirmed"}
+        response = requests.patch(f"{BASE_URL}/admin/orders/{order_id}", 
+                                json=update_data, headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
-            if "order" in data:
-                order = data["order"]
-                # Verify it contains expected fields
-                expected_fields = ["id", "orderNumber", "customerName", "customerPhone", "items", "subtotal", "deliveryFee", "total", "paymentStatus", "orderStatus", "createdAt"]
-                missing_fields = [f for f in expected_fields if f not in order]
-                if missing_fields:
-                    results.add_result("GET /api/orders/:id - fields", False, f"Missing fields: {missing_fields}")
-                else:
-                    results.add_result("GET /api/orders/:id - fields", True, "All expected fields present")
-                
-                results.add_result("GET /api/orders/:id - overall", True, f"Order retrieved successfully: {order['orderNumber']}")
+            order = data.get("order", {})
+            if order.get("orderStatus") == "confirmed" and "updatedAt" in order:
+                log_test("Update orderStatus to confirmed", True, 
+                       f"Status updated, updatedAt: {order.get('updatedAt')}")
             else:
-                results.add_result("GET /api/orders/:id - overall", False, f"Missing 'order' field in response: {data}")
+                log_test("Update orderStatus to confirmed", False, f"Status not updated correctly: {order}")
         else:
-            results.add_result("GET /api/orders/:id - overall", False, f"Status: {response.status_code}, Body: {response.text}")
+            log_test("Update orderStatus to confirmed", False, f"Status: {response.status_code}, Response: {response.text}")
     except Exception as e:
-        results.add_result("GET /api/orders/:id - overall", False, f"Exception: {str(e)}")
+        log_test("Update orderStatus to confirmed", False, f"Exception: {str(e)}")
     
-    # Test 404 for non-existent order
+    # Test 2: Update multiple fields (orderStatus and paymentStatus)
     try:
-        print("\n🔍 Testing GET /api/orders/non-existent-id...")
-        response = requests.get(f"{API_BASE}/orders/non-existent-id", timeout=10)
+        update_data = {"orderStatus": "delivered", "paymentStatus": "paid"}
+        response = requests.patch(f"{BASE_URL}/admin/orders/{order_id}", 
+                                json=update_data, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            order = data.get("order", {})
+            if (order.get("orderStatus") == "delivered" and 
+                order.get("paymentStatus") == "paid" and 
+                "updatedAt" in order):
+                log_test("Update multiple fields", True, 
+                       f"Both fields updated, updatedAt: {order.get('updatedAt')}")
+            else:
+                log_test("Update multiple fields", False, f"Fields not updated correctly: {order}")
+        else:
+            log_test("Update multiple fields", False, f"Status: {response.status_code}, Response: {response.text}")
+    except Exception as e:
+        log_test("Update multiple fields", False, f"Exception: {str(e)}")
+    
+    # Test 3: Update with no allowed fields
+    try:
+        update_data = {"random": "value"}
+        response = requests.patch(f"{BASE_URL}/admin/orders/{order_id}", 
+                                json=update_data, headers=headers, timeout=10)
+        
+        if response.status_code == 400:
+            log_test("Update with no allowed fields", True, f"Correctly returned 400: {response.json()}")
+        else:
+            log_test("Update with no allowed fields", False, f"Expected 400, got {response.status_code}: {response.text}")
+    except Exception as e:
+        log_test("Update with no allowed fields", False, f"Exception: {str(e)}")
+    
+    # Test 4: Update non-existent order
+    try:
+        update_data = {"orderStatus": "confirmed"}
+        response = requests.patch(f"{BASE_URL}/admin/orders/non-existent-id", 
+                                json=update_data, headers=headers, timeout=10)
         
         if response.status_code == 404:
-            results.add_result("GET /api/orders/:id - 404", True, f"Correctly returned 404: {response.json()}")
+            log_test("Update non-existent order", True, f"Correctly returned 404: {response.json()}")
         else:
-            results.add_result("GET /api/orders/:id - 404", False, f"Expected 404, got {response.status_code}")
+            log_test("Update non-existent order", False, f"Expected 404, got {response.status_code}: {response.text}")
     except Exception as e:
-        results.add_result("GET /api/orders/:id - 404", False, f"Exception: {str(e)}")
+        log_test("Update non-existent order", False, f"Exception: {str(e)}")
     
-    return results
-
-def test_list_orders():
-    """Test 6: List orders"""
-    results = TestResults()
-    
+    # Test 5: Update without Authorization header
     try:
-        print("\n🔍 Testing GET /api/orders...")
-        response = requests.get(f"{API_BASE}/orders", timeout=10)
+        update_data = {"orderStatus": "confirmed"}
+        response = requests.patch(f"{BASE_URL}/admin/orders/{order_id}", 
+                                json=update_data, timeout=10)
         
+        if response.status_code == 401:
+            log_test("Update without Authorization", True, f"Correctly returned 401: {response.json()}")
+        else:
+            log_test("Update without Authorization", False, f"Expected 401, got {response.status_code}: {response.text}")
+    except Exception as e:
+        log_test("Update without Authorization", False, f"Exception: {str(e)}")
+
+def test_admin_delete_order():
+    """Test DELETE /api/admin/orders/:id endpoint"""
+    print("=== Testing Admin Delete Order (DELETE /api/admin/orders/:id) ===")
+    
+    # Create a test order specifically for deletion
+    delete_order_id = create_test_order()
+    if not delete_order_id:
+        log_test("Admin delete order", False, "Could not create order for deletion test")
+        return
+    
+    headers = {"Authorization": f"Bearer {ADMIN_PASSWORD}"}
+    
+    # Test 1: Delete with valid auth
+    try:
+        response = requests.delete(f"{BASE_URL}/admin/orders/{delete_order_id}", 
+                                 headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("ok") is True:
+                log_test("Delete with valid auth", True, f"Order deleted successfully: {data}")
+            else:
+                log_test("Delete with valid auth", False, f"Expected {{ok: true}}, got: {data}")
+        else:
+            log_test("Delete with valid auth", False, f"Status: {response.status_code}, Response: {response.text}")
+    except Exception as e:
+        log_test("Delete with valid auth", False, f"Exception: {str(e)}")
+    
+    # Test 2: Delete same order again (should return 404)
+    try:
+        response = requests.delete(f"{BASE_URL}/admin/orders/{delete_order_id}", 
+                                 headers=headers, timeout=10)
+        
+        if response.status_code == 404:
+            log_test("Delete non-existent order", True, f"Correctly returned 404: {response.json()}")
+        else:
+            log_test("Delete non-existent order", False, f"Expected 404, got {response.status_code}: {response.text}")
+    except Exception as e:
+        log_test("Delete non-existent order", False, f"Exception: {str(e)}")
+    
+    # Test 3: Delete without Authorization header
+    try:
+        # Create another order for this test
+        another_order_id = create_test_order()
+        if another_order_id:
+            response = requests.delete(f"{BASE_URL}/admin/orders/{another_order_id}", timeout=10)
+            
+            if response.status_code == 401:
+                log_test("Delete without Authorization", True, f"Correctly returned 401: {response.json()}")
+            else:
+                log_test("Delete without Authorization", False, f"Expected 401, got {response.status_code}: {response.text}")
+        else:
+            log_test("Delete without Authorization", False, "Could not create order for test")
+    except Exception as e:
+        log_test("Delete without Authorization", False, f"Exception: {str(e)}")
+
+def test_regression():
+    """Test that existing endpoints still work"""
+    print("=== Testing Regression - Existing Endpoints ===")
+    
+    # Test 1: GET /api
+    try:
+        response = requests.get(f"{BASE_URL}", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("ok") is True and data.get("service") == "Family Garden API":
+                log_test("GET /api", True, f"Response: {data}")
+            else:
+                log_test("GET /api", False, f"Unexpected response: {data}")
+        else:
+            log_test("GET /api", False, f"Status: {response.status_code}, Response: {response.text}")
+    except Exception as e:
+        log_test("GET /api", False, f"Exception: {str(e)}")
+    
+    # Test 2: POST /api/orders (valid)
+    try:
+        order_data = {
+            "customerName": "Test Customer",
+            "customerPhone": "0721234567",
+            "items": [{"id": "1", "name": "Test Product", "price": 10, "quantity": 1, "unit": "buc"}]
+        }
+        response = requests.post(f"{BASE_URL}/orders", json=order_data, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if "orderId" in data and "orderNumber" in data:
+                log_test("POST /api/orders (valid)", True, f"Order created: {data['orderNumber']}")
+                return data["orderId"]  # Return for further tests
+            else:
+                log_test("POST /api/orders (valid)", False, f"Missing orderId or orderNumber: {data}")
+        else:
+            log_test("POST /api/orders (valid)", False, f"Status: {response.status_code}, Response: {response.text}")
+    except Exception as e:
+        log_test("POST /api/orders (valid)", False, f"Exception: {str(e)}")
+        return None
+    
+    # Test 3: GET /api/orders/:id
+    regression_order_id = create_test_order()
+    if regression_order_id:
+        try:
+            response = requests.get(f"{BASE_URL}/orders/{regression_order_id}", timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if "order" in data:
+                    log_test("GET /api/orders/:id", True, f"Order retrieved successfully")
+                else:
+                    log_test("GET /api/orders/:id", False, f"Missing order in response: {data}")
+            else:
+                log_test("GET /api/orders/:id", False, f"Status: {response.status_code}, Response: {response.text}")
+        except Exception as e:
+            log_test("GET /api/orders/:id", False, f"Exception: {str(e)}")
+    
+    # Test 4: GET /api/orders
+    try:
+        response = requests.get(f"{BASE_URL}/orders", timeout=10)
         if response.status_code == 200:
             data = response.json()
             if "orders" in data and isinstance(data["orders"], list):
-                orders = data["orders"]
-                results.add_result("GET /api/orders - structure", True, f"Found {len(orders)} orders")
-                
-                # Check if orders are sorted by createdAt desc (if we have multiple orders)
-                if len(orders) >= 2:
-                    first_date = orders[0].get("createdAt", "")
-                    second_date = orders[1].get("createdAt", "")
-                    if first_date >= second_date:
-                        results.add_result("GET /api/orders - sorting", True, "Orders sorted by createdAt desc")
-                    else:
-                        results.add_result("GET /api/orders - sorting", False, f"Orders not sorted correctly: {first_date} vs {second_date}")
-                else:
-                    results.add_result("GET /api/orders - sorting", True, "Sorting check skipped (less than 2 orders)")
-                
-                # Verify orders contain expected fields
-                if orders:
-                    order = orders[0]
-                    expected_fields = ["id", "orderNumber", "customerName", "items", "total"]
-                    missing_fields = [f for f in expected_fields if f not in order]
-                    if missing_fields:
-                        results.add_result("GET /api/orders - order fields", False, f"Missing fields in order: {missing_fields}")
-                    else:
-                        results.add_result("GET /api/orders - order fields", True, "Orders contain expected fields")
-                
-                results.add_result("GET /api/orders - overall", True, "Orders list retrieved successfully")
+                log_test("GET /api/orders", True, f"Orders list retrieved: {len(data['orders'])} orders")
             else:
-                results.add_result("GET /api/orders - overall", False, f"Invalid response structure: {data}")
+                log_test("GET /api/orders", False, f"Invalid response structure: {data}")
         else:
-            results.add_result("GET /api/orders - overall", False, f"Status: {response.status_code}, Body: {response.text}")
+            log_test("GET /api/orders", False, f"Status: {response.status_code}, Response: {response.text}")
     except Exception as e:
-        results.add_result("GET /api/orders - overall", False, f"Exception: {str(e)}")
-    
-    return results
+        log_test("GET /api/orders", False, f"Exception: {str(e)}")
 
 def main():
-    """Run all backend tests"""
-    print(f"🚀 Starting Family Garden Backend API Tests")
-    print(f"📍 Base URL: {BASE_URL}")
-    print(f"📍 API Base: {API_BASE}")
-    print(f"⏰ Started at: {datetime.now().isoformat()}")
+    """Run all admin endpoint tests"""
+    print("🚀 Starting Family Garden Admin Backend Tests")
+    print(f"Base URL: {BASE_URL}")
+    print(f"Admin Password: {ADMIN_PASSWORD}")
+    print("=" * 60)
     
-    all_results = TestResults()
-    created_order_id = None
+    # Test admin login
+    test_admin_login()
     
-    # Test 1: Health endpoints
-    print(f"\n{'='*60}")
-    print("TEST 1: Health Check Endpoints")
-    print(f"{'='*60}")
-    health_results = test_health_endpoints()
-    all_results.results.extend(health_results.results)
-    all_results.passed += health_results.passed
-    all_results.failed += health_results.failed
+    # Create a test order for admin operations
+    test_order_id = create_test_order()
     
-    # Test 2: Create order - happy path
-    print(f"\n{'='*60}")
-    print("TEST 2: Create Order - Happy Path (Livrare locală)")
-    print(f"{'='*60}")
-    create_results, order_id = test_create_order_happy_path()
-    created_order_id = order_id
-    all_results.results.extend(create_results.results)
-    all_results.passed += create_results.passed
-    all_results.failed += create_results.failed
+    # Test admin orders list
+    test_admin_orders()
     
-    # Test 3: Create order - pickup
-    print(f"\n{'='*60}")
-    print("TEST 3: Create Order - Pickup (Ridicare personală)")
-    print(f"{'='*60}")
-    pickup_results = test_create_order_pickup()
-    all_results.results.extend(pickup_results.results)
-    all_results.passed += pickup_results.passed
-    all_results.failed += pickup_results.failed
+    # Test admin update order
+    test_admin_update_order(test_order_id)
     
-    # Test 4: Validation errors
-    print(f"\n{'='*60}")
-    print("TEST 4: Validation Errors")
-    print(f"{'='*60}")
-    validation_results = test_validation_errors()
-    all_results.results.extend(validation_results.results)
-    all_results.passed += validation_results.passed
-    all_results.failed += validation_results.failed
+    # Test admin delete order
+    test_admin_delete_order()
     
-    # Test 5: Get single order
-    print(f"\n{'='*60}")
-    print("TEST 5: Get Single Order")
-    print(f"{'='*60}")
-    get_results = test_get_single_order(created_order_id)
-    all_results.results.extend(get_results.results)
-    all_results.passed += get_results.passed
-    all_results.failed += get_results.failed
+    # Test regression
+    test_regression()
     
-    # Test 6: List orders
-    print(f"\n{'='*60}")
-    print("TEST 6: List Orders")
-    print(f"{'='*60}")
-    list_results = test_list_orders()
-    all_results.results.extend(list_results.results)
-    all_results.passed += list_results.passed
-    all_results.failed += list_results.failed
-    
-    # Final summary
-    success = all_results.summary()
-    print(f"⏰ Completed at: {datetime.now().isoformat()}")
-    
-    return 0 if success else 1
+    print("=" * 60)
+    print("🏁 Admin Backend Tests Completed")
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

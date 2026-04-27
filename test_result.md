@@ -202,6 +202,101 @@ backend:
             • GET /api/health returns correct response: {status: "ok"}
             • Both endpoints respond with 200 status code
 
+  - task: "Admin login (POST /api/admin/login)"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            POST /api/admin/login with {password} returns {token: ADMIN_PASSWORD} on match.
+            Wrong password returns 401. ADMIN_PASSWORD in /app/.env is "familygarden2025".
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE TESTING COMPLETED - ALL SCENARIOS PASSED:
+            • Valid password ("familygarden2025"): Returns 200 with {token: "familygarden2025"}
+            • Invalid password ("wrong"): Returns 401 with error message "Parolă incorectă"
+            • Empty body: Returns 401 with error message "Parolă incorectă"
+            • Authentication mechanism working correctly
+
+  - task: "Admin orders list (GET /api/admin/orders)"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            GET /api/admin/orders requires header "Authorization: Bearer familygarden2025".
+            Returns {orders: [...], stats: {total, new, confirmed, delivered, cancelled, revenue}}.
+            stats.revenue = sum of order.total where orderStatus === "delivered".
+            Without/wrong token returns 401.
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE TESTING COMPLETED - ALL SCENARIOS PASSED:
+            • Valid Bearer token: Returns 200 with {orders: [...], stats: {...}}
+            • Stats calculations verified: total matches orders.length, new count correct, revenue calculation correct
+            • No Authorization header: Returns 401 with "Unauthorized" error
+            • Invalid token: Returns 401 with "Unauthorized" error
+            • Response structure correct with orders array and stats object
+
+  - task: "Admin update order (PATCH /api/admin/orders/:id)"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            PATCH /api/admin/orders/:id with auth header.
+            Body fields allowed: orderStatus, paymentStatus, notes (only these are persisted).
+            Returns {order: ...}. Adds updatedAt ISO string.
+            Wrong/no token => 401. Unknown id => 404. No fields => 400.
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE TESTING COMPLETED - ALL SCENARIOS PASSED:
+            • Update orderStatus to "confirmed": Returns 200, status updated, updatedAt timestamp added
+            • Update multiple fields (orderStatus + paymentStatus): Both fields updated correctly with updatedAt
+            • Update with no allowed fields: Returns 400 with "No fields to update" error
+            • Update non-existent order: Returns 404 with "Order not found" error
+            • Update without Authorization header: Returns 401 with "Unauthorized" error
+            • Field validation working correctly - only allowed fields (orderStatus, paymentStatus, notes) are persisted
+
+  - task: "Admin delete order (DELETE /api/admin/orders/:id)"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            DELETE /api/admin/orders/:id requires auth header.
+            Returns {ok:true} on success, 404 if not found, 401 without token.
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE TESTING COMPLETED - ALL SCENARIOS PASSED:
+            • Delete with valid auth: Returns 200 with {ok: true}, order successfully deleted
+            • Delete non-existent order: Returns 404 with "Order not found" error
+            • Delete without Authorization header: Returns 401 with "Unauthorized" error
+            • Deletion functionality working correctly with proper error handling
+
 frontend:
   - task: "Homepage with hero, stats, story, featured products"
     implemented: true
@@ -281,3 +376,40 @@ agent_communication:
         
         All backend functionality is working correctly. MongoDB integration successful.
         No critical issues found. Backend API is production-ready.
+    - agent: "testing"
+      message: |
+        ✅ ADMIN BACKEND TESTING COMPLETED SUCCESSFULLY - ALL 18 TESTS PASSED
+        
+        Comprehensive testing performed on all admin API endpoints:
+        
+        🔍 ADMIN LOGIN (POST /api/admin/login): ✅ WORKING
+        • Valid password → Returns 200 with correct token
+        • Invalid password → Returns 401 with error message
+        • Empty body → Returns 401 with error message
+        
+        🔍 ADMIN ORDERS LIST (GET /api/admin/orders): ✅ WORKING
+        • Valid Bearer token → Returns orders array + stats object
+        • Stats calculations verified (total, new, confirmed, delivered, cancelled, revenue)
+        • No Authorization header → Returns 401
+        • Invalid token → Returns 401
+        
+        🔍 ADMIN UPDATE ORDER (PATCH /api/admin/orders/:id): ✅ WORKING
+        • Update single field → Status updated with updatedAt timestamp
+        • Update multiple fields → Both fields updated correctly
+        • No allowed fields → Returns 400 error
+        • Non-existent order → Returns 404 error
+        • No authorization → Returns 401 error
+        
+        🔍 ADMIN DELETE ORDER (DELETE /api/admin/orders/:id): ✅ WORKING
+        • Valid auth → Returns 200 with {ok: true}
+        • Non-existent order → Returns 404 error
+        • No authorization → Returns 401 error
+        
+        🔍 REGRESSION TESTING: ✅ ALL EXISTING ENDPOINTS WORKING
+        • GET /api → Working correctly
+        • POST /api/orders → Working correctly
+        • GET /api/orders/:id → Working correctly
+        • GET /api/orders → Working correctly
+        
+        All admin functionality is working correctly. Authentication, authorization, 
+        and CRUD operations fully functional. No critical issues found.

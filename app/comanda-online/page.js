@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { products, productCategories } from "@/lib/products-data";
@@ -42,6 +42,18 @@ const ComandaOnlinePage = () => {
     customerAddress: "",
     notes: "",
   });
+
+  // Hydrate cart from localStorage (e.g. when redirected from product detail page)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = JSON.parse(localStorage.getItem("fg_pending_cart") || "{}");
+      if (stored && Object.keys(stored).length > 0) {
+        setCart((prev) => ({ ...prev, ...stored }));
+        localStorage.removeItem("fg_pending_cart");
+      }
+    } catch {}
+  }, []);
 
   const visibleProducts = useMemo(() => {
     return products.filter((product) => {
