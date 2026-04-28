@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import { v4 as uuidv4 } from "uuid";
+import { sendOrderEmails } from "@/lib/email";
 
 let cachedClient = null;
 let cachedDb = null;
@@ -144,6 +145,12 @@ export async function POST(request, { params }) {
       };
 
       await db.collection("orders").insertOne(order);
+
+      // Send email notifications (non-blocking - never fail the order)
+      sendOrderEmails(order).catch((e) =>
+        console.error("[orders] sendOrderEmails error:", e?.message)
+      );
+
       return json({ orderId: id, orderNumber, order });
     }
 
