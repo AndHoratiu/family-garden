@@ -3,6 +3,12 @@ import { siteContent, siteImages } from "@/lib/site-content";
 import { products, productCategories } from "@/lib/products-data";
 import { Button } from "@/components/ui/button";
 import {
+  getCurrentSeasonKey,
+  isProductInSeason,
+  SEASONS,
+  getProductSeasonBadges,
+} from "@/lib/season-utils";
+import {
   MapPin,
   RefreshCcw,
   Truck,
@@ -52,6 +58,16 @@ const stockBadge = (p) => {
 
 const HomePage = () => {
   const featured = products.filter((p) => p.featured && p.active).slice(0, 4);
+  const currentSeasonKey = getCurrentSeasonKey();
+  const currentSeason = SEASONS[currentSeasonKey];
+  const seasonalProducts = products
+    .filter((p) => p.active && isProductInSeason(p.season, currentSeasonKey))
+    .filter((p) => {
+      // Exclude products that are "tot anul" only (we want truly seasonal items)
+      const seasons = (p.season || "").toLowerCase();
+      return !seasons.includes("tot anul");
+    })
+    .slice(0, 4);
 
   return (
     <div>
@@ -126,6 +142,57 @@ const HomePage = () => {
           ))}
         </div>
       </section>
+
+      {/* SEASONAL PRODUCTS - AUTO-DETECTED */}
+      {seasonalProducts.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 py-8 md:px-6">
+          <div className="rounded-[36px] bg-gradient-to-br from-[#eef3ea] via-[#f8faf6] to-[#fff7e6] p-6 ring-1 ring-[#d8e3d4] md:p-10">
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-[#5b7a5f]">
+                  <span className="text-2xl">{currentSeason.emoji}</span> Sezon {currentSeason.label.toLowerCase()}
+                </p>
+                <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight md:text-4xl">
+                  Produse de sezon acum
+                </h2>
+                <p className="mt-2 max-w-xl text-[#516454]">
+                  Cele mai proaspete produse disponibile chiar în acest moment, direct din grădina noastră.
+                </p>
+              </div>
+              <Link href="/comanda-online" className="hidden text-sm font-semibold text-[#2f6a36] hover:underline md:inline">
+                Vezi toate de sezon →
+              </Link>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {seasonalProducts.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/produs/${p.id}`}
+                  className="group flex flex-col rounded-[20px] bg-white p-3 shadow-sm ring-1 ring-[#e3ebde] transition hover:-translate-y-1 hover:shadow-md"
+                >
+                  <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-[#eef3ea]">
+                    <img src={p.image} alt={p.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                  </div>
+                  <div className="px-1 pt-3">
+                    <h3 className="font-serif text-lg font-semibold leading-tight">{p.name}</h3>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {getProductSeasonBadges(p.season).slice(0, 2).map((s) => (
+                        <span key={s.key} className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${s.color}`}>
+                          <span>{s.emoji}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-base font-bold text-[#1f4023]">
+                      {p.price.toFixed(2)} <span className="text-xs font-normal text-[#5b7a5f]">{p.unit}</span>
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* FEATURED PRODUCTS */}
       <section className="mx-auto max-w-7xl px-4 pb-10 md:px-6">

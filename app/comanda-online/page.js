@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { products, productCategories } from "@/lib/products-data";
+import {
+  SEASON_FILTERS,
+  getCurrentSeasonKey,
+  isProductInSeason,
+  getProductSeasonBadges,
+  SEASONS,
+} from "@/lib/season-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +37,7 @@ const ComandaOnlinePage = () => {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Toate");
+  const [season, setSeason] = useState("all");
   const [cart, setCart] = useState({});
   const [delivery, setDelivery] = useState("Livrare locală");
   const [payment, setPayment] = useState("Ramburs");
@@ -72,9 +80,10 @@ const ComandaOnlinePage = () => {
       const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase()) ||
         product.description.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = category === "Toate" || product.category === category;
-      return matchesSearch && matchesCategory && product.active;
+      const matchesSeason = isProductInSeason(product.season, season);
+      return matchesSearch && matchesCategory && matchesSeason && product.active;
     });
-  }, [search, category]);
+  }, [search, category, season]);
 
   const cartItems = useMemo(() => {
     return Object.entries(cart)
@@ -214,6 +223,36 @@ const ComandaOnlinePage = () => {
             </button>
           ))}
         </div>
+
+        {/* Season filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-semibold uppercase tracking-wider text-[#5b7a5f]">
+            Sezon:
+          </span>
+          {SEASON_FILTERS.map((s) => {
+            const active = season === s.key;
+            const isCurrent = s.key === getCurrentSeasonKey();
+            return (
+              <button
+                key={s.key}
+                onClick={() => setSeason(s.key)}
+                className={`relative rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+                  active
+                    ? "bg-[#1f4023] text-white shadow"
+                    : "border border-[#d8e3d4] bg-white text-[#2a4430] hover:border-[#4f8f43]"
+                }`}
+              >
+                <span className="mr-1">{s.emoji}</span>
+                {s.label}
+                {isCurrent && s.key !== "all" && s.key !== "totAnul" && (
+                  <span className="ml-1.5 rounded-full bg-[#4f8f43] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    Acum
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_440px]">
@@ -255,9 +294,17 @@ const ComandaOnlinePage = () => {
                       </p>
                       <h2 className="mt-1 font-serif text-xl font-semibold leading-snug">{product.name}</h2>
                       <p className="mt-1.5 line-clamp-2 text-sm text-[#516454]">{product.description}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                        {getProductSeasonBadges(product.season).map((s) => (
+                          <span
+                            key={s.key}
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${s.color}`}
+                          >
+                            <span>{s.emoji}</span> {s.label}
+                          </span>
+                        ))}
+                      </div>
                       <div className="mt-2 flex items-center gap-3 text-xs text-[#5b7a5f]">
-                        <span>Sezon: {product.season}</span>
-                        <span>•</span>
                         <span>Stoc: {product.stock}</span>
                       </div>
                       <div className="mt-auto flex items-center justify-between pt-4">
