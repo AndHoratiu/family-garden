@@ -575,19 +575,19 @@ const ComandaOnlinePage = () => {
                     sub="La livrare"
                   />
                 )}
-                {onlineEnabled && (
-                  <OptionButton
-                    active={payment === "Plată online"}
-                    onClick={() => setPayment("Plată online")}
-                    icon={CreditCard}
-                    label="Online"
-                    sub="Card"
-                  />
-                )}
+                <OptionButton
+                  active={payment === "Plată online" && onlineEnabled}
+                  onClick={() => setPayment("Plată online")}
+                  icon={CreditCard}
+                  label="Online"
+                  sub={onlineEnabled ? "Card" : "Card · indisponibil"}
+                  disabled={!onlineEnabled}
+                  badge={!onlineEnabled ? "În curând" : null}
+                />
               </div>
-              {payment === "Plată online" && !onlineEnabled && (
+              {!onlineEnabled && (
                 <p className="mt-2 rounded-xl bg-[#fff7e6] p-3 text-xs text-[#8a6212]">
-                  Plata online va fi disponibilă curând. Te contactăm telefonic pentru confirmare.
+                  💳 Plata online cu cardul va fi disponibilă în curând. Momentan poți comanda cu plată ramburs (la livrare).
                 </p>
               )}
             </div>
@@ -615,19 +615,28 @@ const ComandaOnlinePage = () => {
   );
 };
 
-const OptionButton = ({ active, onClick, icon: Icon, label, sub }) => (
+const OptionButton = ({ active, onClick, icon: Icon, label, sub, disabled, badge }) => (
   <button
     type="button"
-    onClick={onClick}
-    className={`flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition ${
-      active
+    onClick={disabled ? undefined : onClick}
+    disabled={disabled}
+    aria-disabled={disabled}
+    className={`relative flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition ${
+      disabled
+        ? "cursor-not-allowed border-[#e3ebde] bg-[#f5f7f2] text-[#9aa89c] opacity-80"
+        : active
         ? "border-[#4f8f43] bg-[#eef3ea] text-[#1f4023] ring-2 ring-[#4f8f43]/20"
         : "border-[#d8e3d4] bg-white text-[#2a4430] hover:border-[#4f8f43]"
     }`}
   >
-    <Icon className={`h-4 w-4 ${active ? "text-[#4f8f43]" : "text-[#5b7a5f]"}`} />
+    {badge && (
+      <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700 ring-1 ring-amber-200">
+        {badge}
+      </span>
+    )}
+    <Icon className={`h-4 w-4 ${disabled ? "text-[#9aa89c]" : active ? "text-[#4f8f43]" : "text-[#5b7a5f]"}`} />
     <span className="text-sm font-semibold">{label}</span>
-    <span className="text-xs text-[#5b7a5f]">{sub}</span>
+    <span className={`text-xs ${disabled ? "text-[#9aa89c]" : "text-[#5b7a5f]"}`}>{sub}</span>
   </button>
 );
 
