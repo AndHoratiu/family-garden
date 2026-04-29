@@ -203,22 +203,28 @@ export default function ProductForm({ mode = "new", productId = null }) {
   const primaryImage = form.images?.[0] || "";
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
-      <div className="mb-6 flex items-center gap-3">
-        <Link href="/admin/products" className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-[#e3ebde] hover:bg-[#eef3ea]">
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#5b7a5f]">
-            Admin / Produse / {mode === "edit" ? "Editare" : "Adaugă"}
-          </p>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight md:text-3xl">
-            {mode === "edit" ? `Editează: ${form.name}` : "Adaugă produs nou"}
-          </h1>
+    <div className="mx-auto max-w-5xl px-4 pb-28 pt-8 md:pb-8 md:px-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/admin/products" className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-[#e3ebde] hover:bg-[#eef3ea]">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#5b7a5f]">
+              Admin / Produse / {mode === "edit" ? "Editare" : "Adaugă"}
+            </p>
+            <h1 className="font-serif text-2xl font-semibold tracking-tight md:text-3xl">
+              {mode === "edit" ? `Editează: ${form.name}` : "Adaugă produs nou"}
+            </h1>
+          </div>
         </div>
+        {/* Desktop save shortcut (also visible at top for quick access) */}
+        <Button type="submit" form="product-form" disabled={saving} className="hidden rounded-full bg-[#4f8f43] hover:bg-[#3f7a35] md:inline-flex">
+          {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Se salvează...</> : <><Save className="mr-2 h-4 w-4" /> Salvează</>}
+        </Button>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-[1fr_360px]">
+      <form id="product-form" onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-[1fr_360px]">
         {/* LEFT: details */}
         <div className="space-y-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#e3ebde] md:p-6">
           <div>
@@ -376,6 +382,18 @@ export default function ProductForm({ mode = "new", productId = null }) {
           </div>
         </div>
       </form>
+
+      {/* Mobile sticky save bar — always visible on mobile so user doesn't have to scroll */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e3ebde] bg-white/95 p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
+        <div className="mx-auto flex max-w-5xl items-center gap-3">
+          <Link href="/admin/products" className="flex-1 rounded-full border border-[#d8e3d4] bg-white px-4 py-2.5 text-center text-sm font-medium text-[#5b7a5f]">
+            Anulează
+          </Link>
+          <Button type="submit" form="product-form" disabled={saving} className="flex-[2] rounded-full bg-[#4f8f43] hover:bg-[#3f7a35]">
+            {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Se salvează...</> : <><Save className="mr-2 h-4 w-4" /> {mode === "edit" ? "Salvează" : "Creează"}</>}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
