@@ -391,6 +391,109 @@ backend:
             DELETE /api/admin/products/:id with auth. Returns {ok:true} on success,
             404 if not found, 401 without token.
 
+  - task: "Public site settings (GET /api/settings)"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            GET /api/settings returns sanitized site settings (no admin emails).
+            Auto-creates with DEFAULT_SETTINGS if not yet saved.
+            Schema: hero, whyUs[], contact, social, delivery, payment.
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE TESTING COMPLETED - ALL SCENARIOS PASSED:
+            • Public settings endpoint returns 200 with correct structure
+            • Response contains all required fields: hero, whyUs, contact, social, delivery, payment
+            • emails field correctly sanitized (not present in public response)
+            • Hero structure verified: title, subtitle, image fields present
+            • Delivery structure verified: enabled, fee, freeAbove, pickupEnabled, pickupAddress fields present
+            • Endpoint works without authentication as expected
+
+  - task: "Admin settings GET/PUT (GET/PUT /api/admin/settings)"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            GET /api/admin/settings returns full settings including emails.recipients.
+            PUT /api/admin/settings (also PATCH supported) accepts partial payload.
+            Allowed top-level keys: hero, whyUs, contact, social, delivery, payment, emails.
+            Adds updatedAt. 401 without auth.
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE TESTING COMPLETED - ALL SCENARIOS PASSED:
+            • Admin GET without auth: Returns 401 as expected
+            • Admin GET with auth: Returns 200 with full settings including emails.recipients
+            • Admin PUT without auth: Returns 401 as expected
+            • Admin PUT with auth: Returns 200, partial updates work correctly
+            • Partial update verification: hero.title and delivery.fee/freeAbove updated correctly
+            • Untouched fields remain intact during partial updates
+            • PATCH alias works correctly (same as PUT)
+            • GET endpoint reflects changes after PUT/PATCH operations
+            • Authentication and authorization working properly
+
+  - task: "Multi-image product support"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            Products support `images: string[]` array. POST/PATCH accept it.
+            When images updated, main `image` auto-syncs to images[0].
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE TESTING COMPLETED - ALL SCENARIOS PASSED:
+            • Create product with images array: Successfully saves images array and auto-syncs main image to images[0]
+            • Update images array: Main image auto-syncs when images updated without explicit image field
+            • Update both image and images: Explicit image field is preserved when both are sent
+            • GET product returns images array: Public endpoint includes images field
+            • Image synchronization logic working correctly
+            • Product creation and update with multi-image support fully functional
+
+  - task: "Dynamic delivery fee from settings"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            POST /api/orders reads delivery fee from settings.
+            Free shipping above threshold supported (settings.delivery.freeAbove).
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE TESTING COMPLETED - ALL SCENARIOS PASSED:
+            • Dynamic delivery fee calculation: Orders correctly use settings.delivery.fee (tested with fee=25)
+            • Free shipping threshold: Orders >= freeAbove get deliveryFee=0 (tested with freeAbove=50)
+            • Below threshold orders: Orders < freeAbove get correct delivery fee
+            • Delivery disabled: When settings.delivery.enabled=false, deliveryFee=0 even for local delivery
+            • Settings integration: Order creation properly reads and applies current delivery settings
+            • Order total calculation: Subtotal + deliveryFee = total calculated correctly
+            • Settings reset: Successfully restored original delivery settings (enabled=true, fee=15, freeAbove=0)
+
 frontend:
   - task: "Homepage with hero, stats, story, featured products"
     implemented: true
@@ -425,11 +528,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Public products list (GET /api/products)"
-    - "Public single product (GET /api/products/:id)"
-    - "Admin products CRUD (GET/POST/PATCH/DELETE /api/admin/products)"
-    - "Auto-seed products from products-data on first DB call"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -556,3 +655,44 @@ agent_communication:
         Cleanup: tests should delete any products they create to keep DB clean.
         Please do NOT delete any of the seed products (id starts with "rosii-gradina",
         "castraveti", "spanac", etc.).
+    - agent: "testing"
+      message: |
+        ✅ NEW SETTINGS API + MULTI-IMAGE + DYNAMIC DELIVERY FEE TESTING COMPLETED - ALL 52 TESTS PASSED
+        
+        Comprehensive testing performed on all new backend features:
+        
+        🔍 PUBLIC SETTINGS API (GET /api/settings): ✅ WORKING
+        • Returns 200 with sanitized settings (emails field removed)
+        • All required fields present: hero, whyUs, contact, social, delivery, payment
+        • Hero and delivery structures verified with all expected fields
+        • Works without authentication as expected
+        
+        🔍 ADMIN SETTINGS API (GET/PUT/PATCH /api/admin/settings): ✅ WORKING
+        • GET without auth: Returns 401 as expected
+        • GET with auth: Returns 200 with full settings including emails.recipients
+        • PUT/PATCH without auth: Returns 401 as expected
+        • PUT/PATCH with auth: Partial updates work correctly
+        • Untouched fields remain intact during partial updates
+        • PATCH works as alias for PUT
+        • GET reflects changes after PUT/PATCH operations
+        
+        🔍 MULTI-IMAGE PRODUCT SUPPORT: ✅ WORKING
+        • Create product with images array: Auto-syncs main image to images[0]
+        • Update images array: Main image auto-syncs when images updated
+        • Update both image and images: Explicit image field preserved
+        • GET product returns images array in public endpoint
+        
+        🔍 DYNAMIC DELIVERY FEE: ✅ WORKING
+        • Orders correctly use settings.delivery.fee for local delivery
+        • Free shipping threshold: Orders >= freeAbove get deliveryFee=0
+        • Below threshold orders get correct delivery fee
+        • Delivery disabled: deliveryFee=0 when settings.delivery.enabled=false
+        • Order total calculation: subtotal + deliveryFee = total
+        • Settings successfully reset to original values
+        
+        🔍 REGRESSION TESTING: ✅ ALL EXISTING ENDPOINTS WORKING
+        • All previously tested endpoints still functional
+        • No breaking changes introduced
+        
+        All new features are working correctly. Settings API, multi-image products, 
+        and dynamic delivery fee fully functional. No critical issues found.

@@ -3,6 +3,7 @@ import { MongoClient } from "mongodb";
 import { v4 as uuidv4 } from "uuid";
 import { sendOrderEmails } from "@/lib/email";
 import { getAllProducts, getProductById, getDb as getProductDb } from "@/lib/products-server";
+import { getSettings, updateSettings } from "@/lib/settings-server";
 
 let cachedClient = null;
 let cachedDb = null;
@@ -54,6 +55,20 @@ export async function GET(request, { params }) {
 
     if (segs[0] === "health") {
       return json({ status: "ok" });
+    }
+
+    // Public site settings (sanitized — no admin recipients)
+    if (segs[0] === "settings") {
+      const s = await getSettings();
+      const { emails, ...publicSettings } = s;
+      return json({ settings: publicSettings });
+    }
+
+    // Admin settings (full)
+    if (segs[0] === "admin" && segs[1] === "settings") {
+      if (!checkAdmin(request)) return json({ error: "Unauthorized" }, 401);
+      const s = await getSettings();
+      return json({ settings: s });
     }
 
     // Public products endpoint
@@ -144,7 +159,16 @@ export async function POST(request, { params }) {
       const db = await getDb();
       const id = uuidv4();
       const subtotal = body.items.reduce((s, i) => s + Number(i.price) * Number(i.quantity), 0);
-      const deliveryFee = body.deliveryMethod === "Livrare locală" ? 15 : 0;
+
+      // Dynamic delivery fee from settings
+      const settings = await getSettings();
+      const isLocal = body.deliveryMethod === "Livrare locală";
+      let deliveryFee = 0;
+      if (isLocal && settings.delivery?.enabled) {
+        deliveryFee = Number(settings.delivery.fee || 0);
+        const freeAbove = Number(settings.delivery.freeAbove || 0);
+        if (freeAbove > 0 && subtotal >= freeAbove) deliveryFee = 0;
+      }
       const total = subtotal + deliveryFee;
 
       const orderNumber = `FG${Date.now().toString().slice(-6)}`;
@@ -229,7 +253,8 @@ export async function POST(request, { params }) {
         minOrder: Number(body.minOrder || 1),
         featured: Boolean(body.featured),
         season: body.season || "Tot anul",
-        image: body.image || "",
+        image: body.image || (Array.isArray(body.images) ? body.images[0] : "") || "",
+        images: Array.isArray(body.images) ? body.images : (body.image ? [body.image] : []),
         active: body.active !== false,
         sortOrder: nextOrder,
         createdAt: new Date().toISOString(),
@@ -282,7 +307,7 @@ export async function PATCH(request, { params }) {
       const db = await getProductDb();
       const allowed = [
         "name", "category", "description", "price", "unit",
-        "stock", "minOrder", "featured", "season", "image", "active", "sortOrder",
+        "stock", "minOrder", "featured", "season", "image", "images", "active", "sortOrder",
       ];
       const update = {};
       for (const k of allowed) {
@@ -291,10 +316,16 @@ export async function PATCH(request, { params }) {
             update[k] = Number(body[k]);
           } else if (["featured", "active"].includes(k)) {
             update[k] = Boolean(body[k]);
+          } else if (k === "images") {
+            update[k] = Array.isArray(body[k]) ? body[k].filter(Boolean) : [];
           } else {
             update[k] = body[k];
           }
         }
+      }
+      // Keep main image in sync with images[0] if images updated and image not explicitly set
+      if (update.images && body.image === undefined && update.images.length > 0) {
+        update.image = update.images[0];
       }
       if (Object.keys(update).length === 0) {
         return json({ error: "No fields to update" }, 400);
@@ -313,9 +344,36 @@ export async function PATCH(request, { params }) {
       return json({ product: rest });
     }
 
+    // Admin: Update site settings
+    if (segs[0] === "admin" && segs[1] === "settings") {
+      if (!checkAdmin(request)) return json({ error: "Unauthorized" }, 401);
+      try {
+        const next = await updateSettings(body || {});
+        return json({ settings: next });
+      } catch (e) {
+        return json({ error: e.message || "Could not update settings" }, 500);
+      }
+    }
+
     return json({ error: "Not found" }, 404);
   } catch (err) {
     console.error("PATCH error:", err);
+    return json({ error: err.message || "Server error" }, 500);
+  }
+}
+
+export async function PUT(request, { params }) {
+  // Alias for PATCH on settings (some clients prefer PUT for full replace)
+  try {
+    const segs = getPath(await params);
+    const body = await request.json().catch(() => ({}));
+    if (segs[0] === "admin" && segs[1] === "settings") {
+      if (!checkAdmin(request)) return json({ error: "Unauthorized" }, 401);
+      const next = await updateSettings(body || {});
+      return json({ settings: next });
+    }
+    return json({ error: "Not found" }, 404);
+  } catch (err) {
     return json({ error: err.message || "Server error" }, 500);
   }
 }

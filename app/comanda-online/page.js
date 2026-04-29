@@ -38,6 +38,7 @@ const ComandaOnlinePage = () => {
   const router = useRouter();
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [settings, setSettings] = useState(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Toate");
   const [season, setSeason] = useState("all");
@@ -54,15 +55,32 @@ const ComandaOnlinePage = () => {
     notes: "",
   });
 
-  // Fetch products from MongoDB
+  // Fetch products + settings from MongoDB
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch("/api/products", { cache: "no-store" });
-        const data = await res.json();
-        if (mounted) setProducts(Array.isArray(data.products) ? data.products : []);
-      } catch (e) {
+        const [pRes, sRes] = await Promise.all([
+          fetch("/api/products", { cache: "no-store" }),
+          fetch("/api/settings", { cache: "no-store" }),
+        ]);
+        const pData = await pRes.json();
+        const sData = await sRes.json();
+        if (!mounted) return;
+        setProducts(Array.isArray(pData.products) ? pData.products : []);
+        setSettings(sData.settings || null);
+        // Default delivery method based on availability
+        const d = sData.settings?.delivery;
+        const p = sData.settings?.payment;
+        if (d) {
+          if (!d.enabled && d.pickupEnabled) setDelivery("Ridicare personală");
+          else if (d.enabled) setDelivery("Livrare locală");
+        }
+        if (p) {
+          if (!p.rambursEnabled && p.onlineEnabled) setPayment("Plată online");
+          else if (p.rambursEnabled) setPayment("Ramburs");
+        }
+      } catch {
         if (mounted) setProducts([]);
       } finally {
         if (mounted) setProductsLoading(false);
@@ -116,7 +134,15 @@ const ComandaOnlinePage = () => {
   }, [cart]);
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const deliveryFee = delivery === "Livrare locală" && subtotal > 0 ? DELIVERY_FEE : 0;
+  const deliveryEnabled = settings?.delivery?.enabled !== false;
+  const pickupEnabled = settings?.delivery?.pickupEnabled !== false;
+  const rambursEnabled = settings?.payment?.rambursEnabled !== false;
+  const onlineEnabled = settings?.payment?.onlineEnabled === true;
+  const deliveryFeeBase = Number(settings?.delivery?.fee ?? DELIVERY_FEE);
+  const freeAbove = Number(settings?.delivery?.freeAbove ?? 0);
+  const isLocalDelivery = delivery === "Livrare locală" && deliveryEnabled;
+  const qualifiesFreeShipping = freeAbove > 0 && subtotal >= freeAbove;
+  const deliveryFee = isLocalDelivery && subtotal > 0 && !qualifiesFreeShipping ? deliveryFeeBase : 0;
   const total = subtotal + deliveryFee;
   const totalQty = cartItems.reduce((s, i) => s + i.quantity, 0);
 
@@ -499,42 +525,60 @@ const ComandaOnlinePage = () => {
             <div>
               <p className="mb-2 text-sm font-semibold">Metodă de livrare</p>
               <div className="grid grid-cols-2 gap-2">
-                <OptionButton
-                  active={delivery === "Livrare locală"}
-                  onClick={() => setDelivery("Livrare locală")}
-                  icon={Truck}
-                  label="Livrare locală"
-                  sub="15 lei"
-                />
-                <OptionButton
-                  active={delivery === "Ridicare personală"}
-                  onClick={() => setDelivery("Ridicare personală")}
-                  icon={Store}
-                  label="Ridicare"
-                  sub="Gratuit"
-                />
+                {deliveryEnabled && (
+                  <OptionButton
+                    active={delivery === "Livrare locală"}
+                    onClick={() => setDelivery("Livrare locală")}
+                    icon={Truck}
+                    label="Livrare locală"
+                    sub={qualifiesFreeShipping ? "Gratuit" : `${deliveryFeeBase} lei`}
+                  />
+                )}
+                {pickupEnabled && (
+                  <OptionButton
+                    active={delivery === "Ridicare personală"}
+                    onClick={() => setDelivery("Ridicare personală")}
+                    icon={Store}
+                    label="Ridicare"
+                    sub="Gratuit"
+                  />
+                )}
               </div>
+              {freeAbove > 0 && !qualifiesFreeShipping && delivery === "Livrare locală" && (
+                <p className="mt-2 rounded-xl bg-[#eef3ea] p-2.5 text-xs text-[#2f6a36]">
+                  💚 Livrare gratuită peste {freeAbove} lei (mai ai {(freeAbove - subtotal).toFixed(2)} lei)
+                </p>
+              )}
+              {delivery === "Ridicare personală" && settings?.delivery?.pickupAddress && (
+                <p className="mt-2 rounded-xl bg-[#f8faf6] p-2.5 text-xs text-[#516454]">
+                  📍 Ridicare de la: {settings.delivery.pickupAddress}
+                </p>
+              )}
             </div>
 
             <div>
               <p className="mb-2 text-sm font-semibold">Metodă de plată</p>
               <div className="grid grid-cols-2 gap-2">
-                <OptionButton
-                  active={payment === "Ramburs"}
-                  onClick={() => setPayment("Ramburs")}
-                  icon={Wallet}
-                  label="Ramburs"
-                  sub="La livrare"
-                />
-                <OptionButton
-                  active={payment === "Plată online"}
-                  onClick={() => setPayment("Plată online")}
-                  icon={CreditCard}
-                  label="Online"
-                  sub="Card"
-                />
+                {rambursEnabled && (
+                  <OptionButton
+                    active={payment === "Ramburs"}
+                    onClick={() => setPayment("Ramburs")}
+                    icon={Wallet}
+                    label="Ramburs"
+                    sub="La livrare"
+                  />
+                )}
+                {onlineEnabled && (
+                  <OptionButton
+                    active={payment === "Plată online"}
+                    onClick={() => setPayment("Plată online")}
+                    icon={CreditCard}
+                    label="Online"
+                    sub="Card"
+                  />
+                )}
               </div>
-              {payment === "Plată online" && (
+              {payment === "Plată online" && !onlineEnabled && (
                 <p className="mt-2 rounded-xl bg-[#fff7e6] p-3 text-xs text-[#8a6212]">
                   Plata online va fi disponibilă curând. Te contactăm telefonic pentru confirmare.
                 </p>

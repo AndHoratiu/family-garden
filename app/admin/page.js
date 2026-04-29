@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AdminShell, { AdminLogin, useAdminToken } from "@/components/admin/admin-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  Lock,
-  LogOut,
   Phone,
   Mail,
   MapPin,
@@ -18,10 +17,7 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  XCircle,
   Truck,
-  Wallet,
-  CreditCard,
   ChevronDown,
   ChevronRight,
   Trash2,
@@ -37,9 +33,7 @@ const STATUS_OPTIONS = [
 const statusInfo = (s) => STATUS_OPTIONS.find((o) => o.value === s) || STATUS_OPTIONS[0];
 
 const AdminPage = () => {
-  const [token, setToken] = useState("");
-  const [pwd, setPwd] = useState("");
-  const [logging, setLogging] = useState(false);
+  const auth = useAdminToken();
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -48,10 +42,7 @@ const AdminPage = () => {
   const [expanded, setExpanded] = useState({});
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const t = localStorage.getItem("fg_admin_token");
-      if (t) setToken(t);
-    }
+    // No-op; auth handled by useAdminToken hook
   }, []);
 
   const fetchOrders = async (tk) => {
@@ -61,8 +52,7 @@ const AdminPage = () => {
         headers: { Authorization: `Bearer ${tk}` },
       });
       if (res.status === 401) {
-        localStorage.removeItem("fg_admin_token");
-        setToken("");
+        auth.logout();
         toast.error("Sesiunea a expirat");
         return;
       }
@@ -78,48 +68,20 @@ const AdminPage = () => {
   };
 
   useEffect(() => {
-    if (token) fetchOrders(token);
-  }, [token]);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLogging(true);
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pwd }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Eroare");
-      localStorage.setItem("fg_admin_token", data.token);
-      setToken(data.token);
-      toast.success("Autentificat cu succes");
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setLogging(false);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("fg_admin_token");
-    setToken("");
-    setOrders([]);
-    setStats(null);
-  };
+    if (auth.token) fetchOrders(auth.token);
+  }, [auth.token]);
 
   const updateStatus = async (id, orderStatus) => {
     try {
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
         body: JSON.stringify({ orderStatus }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Eroare");
       toast.success("Status actualizat");
-      fetchOrders(token);
+      fetchOrders(auth.token);
     } catch (e) {
       toast.error(e.message);
     }
@@ -130,12 +92,12 @@ const AdminPage = () => {
     try {
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${auth.token}` },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Eroare");
       toast.success("Comandă ștearsă");
-      fetchOrders(token);
+      fetchOrders(auth.token);
     } catch (e) {
       toast.error(e.message);
     }
@@ -156,47 +118,17 @@ const AdminPage = () => {
     });
   }, [orders, filter, search]);
 
-  if (!token) {
-    return (
-      <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-10">
-        <div className="rounded-3xl bg-white p-8 shadow-xl ring-1 ring-[#e3ebde]">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef3ea] text-[#2f6a36]">
-            <Lock className="h-7 w-7" />
-          </div>
-          <h1 className="mt-5 text-center text-2xl font-semibold">Admin Family Garden</h1>
-          <p className="mt-1 text-center text-sm text-[#5b7a5f]">Introdu parola pentru a accesa panoul.</p>
-          <form onSubmit={handleLogin} className="mt-6 space-y-4">
-            <div>
-              <Label htmlFor="pwd">Parolă</Label>
-              <Input
-                id="pwd"
-                type="password"
-                value={pwd}
-                onChange={(e) => setPwd(e.target.value)}
-                className="mt-1.5 rounded-xl"
-                required
-                autoFocus
-              />
-            </div>
-            <Button type="submit" disabled={logging} className="w-full rounded-full bg-[#4f8f43] hover:bg-[#3f7a35]">
-              {logging ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Se verifică...</> : "Intră"}
-            </Button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  if (!auth.ready) return null;
+  if (!auth.token) return <AdminLogin {...auth} />;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 md:px-6">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <AdminShell token={auth.token} onLogout={auth.logout} title="Comenzi">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#5b7a5f]">Panou administrare</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight md:text-4xl">Comenzi Family Garden</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5b7a5f]">Panou administrare</p>
+          <h1 className="mt-1 font-serif text-2xl font-semibold tracking-tight md:text-3xl">Comenzi Family Garden</h1>
         </div>
-        <Button onClick={handleLogout} variant="outline" className="rounded-full">
-          <LogOut className="mr-2 h-4 w-4" /> Ieșire
-        </Button>
       </div>
 
       {stats && (
@@ -324,6 +256,7 @@ const AdminPage = () => {
         </div>
       )}
     </div>
+    </AdminShell>
   );
 };
 

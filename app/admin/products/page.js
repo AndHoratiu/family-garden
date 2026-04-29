@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import AdminShell, { AdminLogin, useAdminToken } from "@/components/admin/admin-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  Lock, LogOut, Loader2, Search, Plus, Trash2, Edit3,
-  Package, Eye, EyeOff, Star, ArrowLeft, Save, RefreshCcw,
+  Loader2, Search, Plus, Trash2, Edit3,
+  Eye, EyeOff, Star, Save, RefreshCcw,
 } from "lucide-react";
 
 const stockBadge = (p) => {
@@ -21,22 +22,13 @@ const stockBadge = (p) => {
 const CATEGORIES = ["Legume", "Fructe", "Flori", "Răsaduri", "Produse artizanale"];
 
 export default function AdminProductsPage() {
-  const [token, setToken] = useState("");
-  const [pwd, setPwd] = useState("");
-  const [logging, setLogging] = useState(false);
+  const auth = useAdminToken();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
-  const [editingStock, setEditingStock] = useState({}); // { [id]: stockValue }
+  const [editingStock, setEditingStock] = useState({});
   const [savingId, setSavingId] = useState(null);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const t = localStorage.getItem("fg_admin_token");
-      if (t) setToken(t);
-    }
-  }, []);
 
   const fetchProducts = async (tk) => {
     setLoading(true);
@@ -45,8 +37,7 @@ export default function AdminProductsPage() {
         headers: { Authorization: `Bearer ${tk}` },
       });
       if (res.status === 401) {
-        localStorage.removeItem("fg_admin_token");
-        setToken("");
+        auth.logout();
         toast.error("Sesiunea a expirat");
         return;
       }
@@ -61,41 +52,15 @@ export default function AdminProductsPage() {
   };
 
   useEffect(() => {
-    if (token) fetchProducts(token);
-  }, [token]);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLogging(true);
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pwd }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Eroare");
-      localStorage.setItem("fg_admin_token", data.token);
-      setToken(data.token);
-      toast.success("Autentificat cu succes");
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setLogging(false);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("fg_admin_token");
-    setToken("");
-  };
+    if (auth.token) fetchProducts(auth.token);
+  }, [auth.token]); // eslint-disable-line
 
   const updateProduct = async (id, fields, silent = false) => {
     setSavingId(id);
     try {
       const res = await fetch(`/api/admin/products/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
         body: JSON.stringify(fields),
       });
       const data = await res.json();
@@ -127,7 +92,7 @@ export default function AdminProductsPage() {
     try {
       const res = await fetch(`/api/admin/products/${p.id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${auth.token}` },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Eroare");
@@ -158,39 +123,19 @@ export default function AdminProductsPage() {
     return { total, active, inactive, lowStock, outOfStock };
   }, [products]);
 
-  if (!token) {
-    return (
-      <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-10">
-        <div className="rounded-3xl bg-white p-8 shadow-xl ring-1 ring-[#e3ebde]">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef3ea] text-[#2f6a36]">
-            <Lock className="h-7 w-7" />
-          </div>
-          <h1 className="mt-5 text-center font-serif text-2xl font-semibold">Admin produse</h1>
-          <form onSubmit={handleLogin} className="mt-6 space-y-4">
-            <Input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="Parolă" className="rounded-xl" required autoFocus />
-            <Button type="submit" disabled={logging} className="w-full rounded-full bg-[#4f8f43] hover:bg-[#3f7a35]">
-              {logging ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Se verifică...</> : "Intră"}
-            </Button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  if (!auth.ready) return null;
+  if (!auth.token) return <AdminLogin {...auth} />;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link href="/admin" className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-[#e3ebde] hover:bg-[#eef3ea]">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#5b7a5f]">Admin / Produse</p>
-            <h1 className="font-serif text-3xl font-semibold tracking-tight">Gestiune produse</h1>
-          </div>
+    <AdminShell token={auth.token} onLogout={auth.logout} title="Produse">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#5b7a5f]">Admin / Produse</p>
+          <h1 className="font-serif text-2xl font-semibold tracking-tight md:text-3xl">Gestiune produse</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => fetchProducts(token)} variant="outline" className="rounded-full" disabled={loading}>
+          <Button onClick={() => fetchProducts(auth.token)} variant="outline" className="rounded-full" disabled={loading}>
             <RefreshCcw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Reîncarcă
           </Button>
           <Link href="/admin/products/new">
@@ -198,7 +143,6 @@ export default function AdminProductsPage() {
               <Plus className="mr-2 h-4 w-4" /> Adaugă produs
             </Button>
           </Link>
-          <Button onClick={handleLogout} variant="ghost" className="rounded-full"><LogOut className="h-4 w-4" /></Button>
         </div>
       </div>
 
@@ -310,6 +254,7 @@ export default function AdminProductsPage() {
         </div>
       )}
     </div>
+    </AdminShell>
   );
 }
 

@@ -9,7 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, Image as ImageIcon, Upload, X } from "lucide-react";
+import {
+  ArrowLeft, Loader2, Save, Image as ImageIcon, Upload, X, Star,
+  ArrowLeft as ChevLeft, ArrowRight as ChevRight, Plus,
+} from "lucide-react";
 
 const CATEGORIES = ["Legume", "Fructe", "Flori", "Răsaduri", "Produse artizanale"];
 const SEASONS = [
@@ -41,11 +44,8 @@ const resizeImage = (dataUrl, maxWidth = 1200, quality = 0.85) =>
         ctx.fillStyle = "#fff";
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
-        const out = canvas.toDataURL("image/jpeg", quality);
-        resolve(out);
-      } catch (err) {
-        reject(err);
-      }
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } catch (err) { reject(err); }
     };
     img.onerror = () => reject(new Error("Imagine invalidă"));
     img.src = dataUrl;
@@ -56,33 +56,13 @@ export default function ProductForm({ mode = "new", productId = null }) {
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
   const [form, setForm] = useState({
     name: "", category: "Legume", description: "",
     price: "", unit: "lei / kg", stock: 0, minOrder: 1,
-    featured: false, season: "Tot anul", image: "", active: true,
+    featured: false, season: "Tot anul", images: [], active: true,
   });
-  const [uploading, setUploading] = useState(false);
-
-  const handleImageFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Te rog selectează un fișier imagine.");
-      return;
-    }
-    setUploading(true);
-    try {
-      const dataUrl = await readFileAsDataUrl(file);
-      const resized = await resizeImage(dataUrl, 1200, 0.85);
-      setForm((prev) => ({ ...prev, image: resized }));
-      toast.success("Imagine încărcată");
-    } catch (err) {
-      toast.error("Nu am putut încărca imaginea: " + err.message);
-    } finally {
-      setUploading(false);
-      e.target.value = ""; // allow re-select
-    }
-  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -104,7 +84,12 @@ export default function ProductForm({ mode = "new", productId = null }) {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Eroare");
-        setForm(data.product);
+        // Backwards compatibility: build images[] from image if missing
+        const p = data.product || {};
+        const images = Array.isArray(p.images) && p.images.length > 0
+          ? p.images
+          : (p.image ? [p.image] : []);
+        setForm({ ...p, images });
       } catch (e) {
         toast.error(e.message);
         router.push("/admin/products");
@@ -113,6 +98,68 @@ export default function ProductForm({ mode = "new", productId = null }) {
       }
     })();
   }, [mode, productId, token, router]);
+
+  const addImageFromFile = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      const newImgs = [];
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        const dataUrl = await readFileAsDataUrl(file);
+        const resized = await resizeImage(dataUrl, 1200, 0.85);
+        newImgs.push(resized);
+      }
+      if (newImgs.length === 0) {
+        toast.error("Niciun fișier imagine valid");
+      } else {
+        setForm((p) => ({ ...p, images: [...(p.images || []), ...newImgs] }));
+        toast.success(`${newImgs.length} ${newImgs.length === 1 ? "imagine adăugată" : "imagini adăugate"}`);
+      }
+    } catch (err) {
+      toast.error("Eroare la încărcare: " + err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const addImageFromUrl = () => {
+    const url = (urlInput || "").trim();
+    if (!url) return;
+    if (!/^https?:\/\//.test(url) && !url.startsWith("data:")) {
+      toast.error("Introduceți un URL valid (http/https)");
+      return;
+    }
+    setForm((p) => ({ ...p, images: [...(p.images || []), url] }));
+    setUrlInput("");
+    toast.success("Imagine adăugată");
+  };
+
+  const removeImage = (idx) => {
+    setForm((p) => ({ ...p, images: p.images.filter((_, i) => i !== idx) }));
+  };
+
+  const moveImage = (idx, dir) => {
+    setForm((p) => {
+      const arr = [...p.images];
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= arr.length) return p;
+      [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+      return { ...p, images: arr };
+    });
+  };
+
+  const setAsPrimary = (idx) => {
+    setForm((p) => {
+      if (idx === 0) return p;
+      const arr = [...p.images];
+      const [picked] = arr.splice(idx, 1);
+      arr.unshift(picked);
+      return { ...p, images: arr };
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -124,15 +171,19 @@ export default function ProductForm({ mode = "new", productId = null }) {
     try {
       const url = mode === "edit" ? `/api/admin/products/${productId}` : "/api/admin/products";
       const method = mode === "edit" ? "PATCH" : "POST";
+      const images = (form.images || []).filter(Boolean);
+      const payload = {
+        ...form,
+        price: Number(form.price),
+        stock: Number(form.stock || 0),
+        minOrder: Number(form.minOrder || 1),
+        images,
+        image: images[0] || "",
+      };
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          ...form,
-          price: Number(form.price),
-          stock: Number(form.stock || 0),
-          minOrder: Number(form.minOrder || 1),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Eroare");
@@ -149,22 +200,27 @@ export default function ProductForm({ mode = "new", productId = null }) {
     return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#5b7a5f]" /></div>;
   }
 
+  const primaryImage = form.images?.[0] || "";
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 md:px-6">
+    <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
       <div className="mb-6 flex items-center gap-3">
         <Link href="/admin/products" className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-[#e3ebde] hover:bg-[#eef3ea]">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#5b7a5f]">Admin / Produse / {mode === "edit" ? "Editare" : "Adaugă"}</p>
-          <h1 className="font-serif text-3xl font-semibold tracking-tight">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#5b7a5f]">
+            Admin / Produse / {mode === "edit" ? "Editare" : "Adaugă"}
+          </p>
+          <h1 className="font-serif text-2xl font-semibold tracking-tight md:text-3xl">
             {mode === "edit" ? `Editează: ${form.name}` : "Adaugă produs nou"}
           </h1>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-[1fr_320px]">
-        <div className="space-y-5 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#e3ebde]">
+      <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-[1fr_360px]">
+        {/* LEFT: details */}
+        <div className="space-y-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#e3ebde] md:p-6">
           <div>
             <Label htmlFor="name">Nume produs *</Label>
             <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Roșii de grădină" className="mt-1.5 rounded-xl" required />
@@ -190,7 +246,7 @@ export default function ProductForm({ mode = "new", productId = null }) {
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <Label htmlFor="price">Preț (lei) *</Label>
-              <Input id="price" type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="8.00" className="mt-1.5 rounded-xl" required />
+              <Input id="price" type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="8.00" className="mt-1.5 rounded-xl" required />
             </div>
             <div>
               <Label htmlFor="unit">Unitate *</Label>
@@ -206,47 +262,76 @@ export default function ProductForm({ mode = "new", productId = null }) {
             <Input id="stock" type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="mt-1.5 rounded-xl" />
             <p className="mt-1 text-xs text-[#5b7a5f]">0 = Indisponibil &middot; 1-10 = Stoc limitat &middot; 11+ = În stoc</p>
           </div>
-          <div>
-            <Label>Imagine produs</Label>
-            <div className="mt-1.5 space-y-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <label className={`inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#4f8f43] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#3f7a35] ${uploading ? "pointer-events-none opacity-70" : ""}`}>
-                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  {uploading ? "Se încarcă..." : "Încarcă poză"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageFile}
-                    disabled={uploading}
-                    className="hidden"
-                  />
-                </label>
-                {form.image && (
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, image: "" })}
-                    className="inline-flex items-center gap-1 rounded-full border border-[#d8e3d4] bg-white px-3 py-1.5 text-xs text-[#5b7a5f] hover:bg-red-50 hover:text-red-600"
-                  >
-                    <X className="h-3 w-3" /> Elimină
-                  </button>
-                )}
+
+          {/* IMAGES SECTION */}
+          <div className="rounded-2xl bg-[#f8faf6] p-4 ring-1 ring-[#e3ebde]">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-semibold">Imagini produs</Label>
+                <p className="text-xs text-[#5b7a5f]">Prima imagine apare ca principală pe site.</p>
               </div>
-              <div className="relative">
-                <Input
-                  id="image"
-                  value={form.image && form.image.startsWith("data:") ? "📷 Imagine încărcată local" : form.image}
-                  onChange={(e) => setForm({ ...form, image: e.target.value })}
-                  placeholder="sau lipește un URL: https://..."
-                  className="rounded-xl"
-                  readOnly={form.image?.startsWith("data:")}
-                />
-              </div>
-              <p className="text-xs text-[#5b7a5f]">
-                Acceptă JPG, PNG, WebP. Imaginea e redimensionată automat la max. 1200px.
-                Sau lipește un URL (Drive/Pexels/etc).
-              </p>
+              <label className={`inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#4f8f43] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#3f7a35] ${uploading ? "pointer-events-none opacity-70" : ""}`}>
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {uploading ? "Se încarcă..." : "Adaugă poză"}
+                <input type="file" accept="image/*" multiple onChange={addImageFromFile} disabled={uploading} className="hidden" />
+              </label>
             </div>
+
+            {(form.images || []).length === 0 ? (
+              <div className="mt-4 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d8e3d4] bg-white py-10 text-center">
+                <ImageIcon className="h-10 w-10 text-[#bdd1bf]" />
+                <p className="mt-2 text-sm text-[#5b7a5f]">Nicio imagine adăugată încă</p>
+              </div>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {form.images.map((src, idx) => (
+                  <div key={idx} className={`group relative overflow-hidden rounded-2xl bg-white ring-1 ${idx === 0 ? "ring-2 ring-[#4f8f43]" : "ring-[#e3ebde]"}`}>
+                    <div className="aspect-square">
+                      <img src={src} alt={`Imagine ${idx + 1}`} className="h-full w-full object-cover" onError={(e) => { e.target.style.opacity = "0.3"; }} />
+                    </div>
+                    {idx === 0 && (
+                      <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[#4f8f43] px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                        <Star className="h-3 w-3 fill-current" /> Principală
+                      </span>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 transition group-hover:opacity-100">
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => moveImage(idx, -1)} disabled={idx === 0} className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[#1f4023] disabled:opacity-30">
+                          <ChevLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => moveImage(idx, 1)} disabled={idx === form.images.length - 1} className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[#1f4023] disabled:opacity-30">
+                          <ChevRight className="h-3.5 w-3.5" />
+                        </button>
+                        {idx !== 0 && (
+                          <button type="button" onClick={() => setAsPrimary(idx)} title="Setează ca principală" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-amber-600 hover:bg-amber-50">
+                            <Star className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      <button type="button" onClick={() => removeImage(idx)} className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="sau lipește un URL imagine..."
+                className="rounded-xl bg-white"
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addImageFromUrl(); } }}
+              />
+              <Button type="button" onClick={addImageFromUrl} variant="outline" className="rounded-full">
+                <Plus className="mr-1 h-4 w-4" /> Adaugă URL
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-[#5b7a5f]">JPG/PNG/WebP. Imaginile sunt redimensionate automat la max. 1200px.</p>
           </div>
+
           <div className="flex flex-col gap-3 rounded-2xl bg-[#f8faf6] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label htmlFor="active" className="font-semibold">Activ pe site</Label>
@@ -257,23 +342,32 @@ export default function ProductForm({ mode = "new", productId = null }) {
           <div className="flex flex-col gap-3 rounded-2xl bg-[#f8faf6] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label htmlFor="featured" className="font-semibold">Featured (recomandat)</Label>
-              <p className="text-xs text-[#5b7a5f]">Apare pe homepage în secțiunea "Produse recomandate".</p>
+              <p className="text-xs text-[#5b7a5f]">Apare pe homepage în secțiunea „Produse recomandate".</p>
             </div>
             <Switch id="featured" checked={form.featured} onCheckedChange={(v) => setForm({ ...form, featured: v })} />
           </div>
         </div>
 
-        <div className="space-y-5">
+        {/* RIGHT: preview + actions */}
+        <div className="space-y-4">
           <div className="sticky top-24 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#e3ebde]">
-            <p className="mb-3 text-sm font-semibold">Previzualizare imagine</p>
+            <p className="mb-3 text-sm font-semibold">Previzualizare</p>
             <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-[#eef3ea]">
-              {form.image ? (
-                <img src={form.image} alt={form.name || "Preview"} className="h-full w-full object-cover" onError={(e) => { e.target.style.display = "none"; }} />
+              {primaryImage ? (
+                <img src={primaryImage} alt={form.name || "Preview"} className="h-full w-full object-cover" onError={(e) => { e.target.style.display = "none"; }} />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-[#5b7a5f]">
                   <ImageIcon className="h-10 w-10" />
                 </div>
               )}
+            </div>
+            <div className="mt-3 space-y-1">
+              <h3 className="font-serif text-lg font-semibold leading-tight">{form.name || "Numele produsului"}</h3>
+              <p className="text-xs text-[#5b7a5f]">{form.category} · {form.season}</p>
+              <p className="text-xl font-bold text-[#1f4023]">
+                {Number(form.price || 0).toFixed(2)} <span className="text-xs font-normal text-[#5b7a5f]">{form.unit}</span>
+              </p>
+              <p className="text-xs text-[#5b7a5f]">Stoc: {form.stock}</p>
             </div>
             <Button type="submit" disabled={saving} className="mt-5 w-full rounded-full bg-[#4f8f43] hover:bg-[#3f7a35]">
               {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Se salvează...</> : <><Save className="mr-2 h-4 w-4" /> {mode === "edit" ? "Salvează modificările" : "Creează produsul"}</>}
