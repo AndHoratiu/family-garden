@@ -8,8 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter", display: "swap" });
 const playfair = Playfair_Display({ subsets: ["latin", "latin-ext"], variable: "--font-playfair", display: "swap", weight: ["400", "500", "600", "700", "800"] });
 
-const SITE_URL = "https://familygarden.ro";
-const SITE_LOGO = "https://familygarden.ro/og-image.jpg";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://familygarden.ro";
 const FALLBACK_LOGO = "https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg";
 
 export const metadata = {
