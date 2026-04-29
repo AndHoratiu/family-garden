@@ -156,6 +156,33 @@ export async function POST(request, { params }) {
         }
       }
 
+      // Validate stock + active for each item against current DB state
+      const dbProducts = await getAllProducts({ activeOnly: false });
+      const productMap = new Map(dbProducts.map((p) => [p.id, p]));
+      const stockErrors = [];
+      for (const item of body.items) {
+        const p = productMap.get(item.id);
+        if (!p) {
+          stockErrors.push(`${item.name || item.id}: produs inexistent`);
+          continue;
+        }
+        if (!p.active) {
+          stockErrors.push(`${p.name}: indisponibil momentan`);
+          continue;
+        }
+        const qty = Number(item.quantity || 0);
+        if (qty <= 0) {
+          stockErrors.push(`${p.name}: cantitate invalidă`);
+          continue;
+        }
+        if (Number(p.stock || 0) < qty) {
+          stockErrors.push(`${p.name}: stoc insuficient (disponibil: ${p.stock || 0})`);
+        }
+      }
+      if (stockErrors.length > 0) {
+        return json({ error: stockErrors.join("; "), stockErrors }, 409);
+      }
+
       const db = await getDb();
       const id = uuidv4();
       const subtotal = body.items.reduce((s, i) => s + Number(i.price) * Number(i.quantity), 0);
@@ -193,6 +220,21 @@ export async function POST(request, { params }) {
       };
 
       await db.collection("orders").insertOne(order);
+
+      // Decrement stock atomically per product (best-effort)
+      try {
+        const productsCol = db.collection("products");
+        await Promise.all(
+          body.items.map((item) =>
+            productsCol.updateOne(
+              { id: item.id, stock: { $gte: Number(item.quantity) } },
+              { $inc: { stock: -Number(item.quantity) } }
+            )
+          )
+        );
+      } catch (e) {
+        console.error("[orders] stock decrement error:", e?.message);
+      }
 
       // Send email notifications (non-blocking - never fail the order)
       sendOrderEmails(order).catch((e) =>

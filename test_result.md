@@ -469,6 +469,24 @@ backend:
             • Image synchronization logic working correctly
             • Product creation and update with multi-image support fully functional
 
+  - task: "Order stock validation + decrement (POST /api/orders)"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Validated end-to-end via curl:
+            • Stock 0 product → 409 with "stoc insuficient"
+            • Inactive product → 409 with "indisponibil momentan"
+            • Quantity > stock → 409
+            • Successful order decrements stock atomically (24 → 22 after qty=2 order)
+            • Settings.delivery.fee dynamically applied (verified 15 → 20 swap)
+
   - task: "Dynamic delivery fee from settings"
     implemented: true
     working: true
