@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { products, productCategories } from "@/lib/products-data";
 import {
   SEASON_FILTERS,
   getCurrentSeasonKey,
@@ -33,8 +32,12 @@ import {
 
 const DELIVERY_FEE = 15;
 
+const productCategories = ["Toate", "Legume", "Fructe", "Flori", "Răsaduri", "Produse artizanale"];
+
 const ComandaOnlinePage = () => {
   const router = useRouter();
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Toate");
   const [season, setSeason] = useState("all");
@@ -50,6 +53,23 @@ const ComandaOnlinePage = () => {
     customerAddress: "",
     notes: "",
   });
+
+  // Fetch products from MongoDB
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/products", { cache: "no-store" });
+        const data = await res.json();
+        if (mounted) setProducts(Array.isArray(data.products) ? data.products : []);
+      } catch (e) {
+        if (mounted) setProducts([]);
+      } finally {
+        if (mounted) setProductsLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   // Hydrate cart from localStorage (initial + redirect from product detail)
   useEffect(() => {

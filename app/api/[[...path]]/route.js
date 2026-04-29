@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import { v4 as uuidv4 } from "uuid";
 import { sendOrderEmails } from "@/lib/email";
+import { getAllProducts, getProductById, getDb as getProductDb } from "@/lib/products-server";
 
 let cachedClient = null;
 let cachedDb = null;
@@ -53,6 +54,29 @@ export async function GET(request, { params }) {
 
     if (segs[0] === "health") {
       return json({ status: "ok" });
+    }
+
+    // Public products endpoint
+    if (segs[0] === "products") {
+      if (segs[1]) {
+        const product = await getProductById(segs[1]);
+        if (!product) return json({ error: "Product not found" }, 404);
+        return json({ product });
+      }
+      const products = await getAllProducts({ activeOnly: true });
+      return json({ products });
+    }
+
+    // Admin products endpoint
+    if (segs[0] === "admin" && segs[1] === "products") {
+      if (!checkAdmin(request)) return json({ error: "Unauthorized" }, 401);
+      if (segs[2]) {
+        const product = await getProductById(segs[2]);
+        if (!product) return json({ error: "Product not found" }, 404);
+        return json({ product });
+      }
+      const products = await getAllProducts({ activeOnly: false });
+      return json({ products });
     }
 
     if (segs[0] === "orders") {
@@ -165,6 +189,56 @@ export async function POST(request, { params }) {
       return json({ token: process.env.ADMIN_PASSWORD });
     }
 
+    // Admin: Create product
+    if (segs[0] === "admin" && segs[1] === "products") {
+      if (!checkAdmin(request)) return json({ error: "Unauthorized" }, 401);
+      const required = ["name", "category", "price", "unit"];
+      for (const k of required) {
+        if (body[k] === undefined || body[k] === null || body[k] === "") {
+          return json({ error: `Missing field: ${k}` }, 400);
+        }
+      }
+      const db = await getProductDb();
+      const slug = (body.id || body.name)
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+      let id = slug;
+      let suffix = 1;
+      while (await db.collection("products").findOne({ id })) {
+        id = `${slug}-${++suffix}`;
+      }
+      const lastSorted = await db
+        .collection("products")
+        .find({})
+        .sort({ sortOrder: -1 })
+        .limit(1)
+        .toArray();
+      const nextOrder = (lastSorted[0]?.sortOrder || 0) + 1;
+      const product = {
+        id,
+        name: body.name,
+        category: body.category,
+        description: body.description || "",
+        price: Number(body.price),
+        unit: body.unit,
+        stock: Number(body.stock || 0),
+        minOrder: Number(body.minOrder || 1),
+        featured: Boolean(body.featured),
+        season: body.season || "Tot anul",
+        image: body.image || "",
+        active: body.active !== false,
+        sortOrder: nextOrder,
+        createdAt: new Date().toISOString(),
+      };
+      await db.collection("products").insertOne(product);
+      const { _id, ...rest } = product;
+      return json({ product: rest });
+    }
+
     return json({ error: "Not found" }, 404);
   } catch (err) {
     console.error("POST error:", err);
@@ -202,6 +276,43 @@ export async function PATCH(request, { params }) {
       return json({ order: rest });
     }
 
+    // Admin: Update product
+    if (segs[0] === "admin" && segs[1] === "products" && segs[2]) {
+      if (!checkAdmin(request)) return json({ error: "Unauthorized" }, 401);
+      const db = await getProductDb();
+      const allowed = [
+        "name", "category", "description", "price", "unit",
+        "stock", "minOrder", "featured", "season", "image", "active", "sortOrder",
+      ];
+      const update = {};
+      for (const k of allowed) {
+        if (body[k] !== undefined) {
+          if (["price", "stock", "minOrder", "sortOrder"].includes(k)) {
+            update[k] = Number(body[k]);
+          } else if (["featured", "active"].includes(k)) {
+            update[k] = Boolean(body[k]);
+          } else {
+            update[k] = body[k];
+          }
+        }
+      }
+      if (Object.keys(update).length === 0) {
+        return json({ error: "No fields to update" }, 400);
+      }
+      update.updatedAt = new Date().toISOString();
+      const result = await db
+        .collection("products")
+        .findOneAndUpdate(
+          { id: segs[2] },
+          { $set: update },
+          { returnDocument: "after" }
+        );
+      const doc = result?.value || result;
+      if (!doc) return json({ error: "Product not found" }, 404);
+      const { _id, ...rest } = doc;
+      return json({ product: rest });
+    }
+
     return json({ error: "Not found" }, 404);
   } catch (err) {
     console.error("PATCH error:", err);
@@ -217,6 +328,13 @@ export async function DELETE(request, { params }) {
       const db = await getDb();
       const result = await db.collection("orders").deleteOne({ id: segs[2] });
       if (result.deletedCount === 0) return json({ error: "Order not found" }, 404);
+      return json({ ok: true });
+    }
+    if (segs[0] === "admin" && segs[1] === "products" && segs[2]) {
+      if (!checkAdmin(request)) return json({ error: "Unauthorized" }, 401);
+      const db = await getProductDb();
+      const result = await db.collection("products").deleteOne({ id: segs[2] });
+      if (result.deletedCount === 0) return json({ error: "Product not found" }, 404);
       return json({ ok: true });
     }
     return json({ error: "Not found" }, 404);

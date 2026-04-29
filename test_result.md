@@ -297,6 +297,100 @@ backend:
             • Delete without Authorization header: Returns 401 with "Unauthorized" error
             • Deletion functionality working correctly with proper error handling
 
+  - task: "Public products list (GET /api/products)"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            GET /api/products returns { products: [...] } with active products only.
+            On first DB call, products collection is auto-seeded from /app/lib/products-data.js
+            (27 products) via ensureSeeded() in /app/lib/products-server.js.
+            Each product has: id, name, category, description, price, unit, stock,
+            minOrder, featured, season, image, active, sortOrder, createdAt.
+            Sorted by sortOrder asc, then createdAt asc.
+
+  - task: "Public single product (GET /api/products/:id)"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            GET /api/products/:id returns { product } by string id.
+            Returns 404 if not found.
+
+  - task: "Admin products list (GET /api/admin/products)"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            GET /api/admin/products requires Bearer token (ADMIN_PASSWORD = "familygarden2025").
+            Returns ALL products including inactive (activeOnly: false). 401 without token.
+
+  - task: "Admin create product (POST /api/admin/products)"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            POST /api/admin/products with auth + body { name, category, price, unit, ...optional }.
+            Auto-generates slug-based unique id (with -2, -3 suffix on conflict).
+            Auto-assigns sortOrder = max+1. Defaults: stock=0, minOrder=1, active=true,
+            featured=false, season="Tot anul", description="", image="".
+            Returns 400 if any required field missing. 401 without token.
+
+  - task: "Admin update product (PATCH /api/admin/products/:id)"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            PATCH /api/admin/products/:id with auth. Allowed fields:
+            name, category, description, price, unit, stock, minOrder, featured,
+            season, image, active, sortOrder. Adds updatedAt. 404 if not found,
+            400 if no allowed fields, 401 without token. Numeric coercion for
+            price/stock/minOrder/sortOrder, boolean for featured/active.
+
+  - task: "Admin delete product (DELETE /api/admin/products/:id)"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            DELETE /api/admin/products/:id with auth. Returns {ok:true} on success,
+            404 if not found, 401 without token.
+
 frontend:
   - task: "Homepage with hero, stats, story, featured products"
     implemented: true
@@ -331,7 +425,11 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Public products list (GET /api/products)"
+    - "Public single product (GET /api/products/:id)"
+    - "Admin products CRUD (GET/POST/PATCH/DELETE /api/admin/products)"
+    - "Auto-seed products from products-data on first DB call"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -413,3 +511,48 @@ agent_communication:
         
         All admin functionality is working correctly. Authentication, authorization, 
         and CRUD operations fully functional. No critical issues found.
+    - agent: "main"
+      message: |
+        🔄 NEW PRODUCTS API ENDPOINTS — NEEDS TESTING
+        
+        Implemented full CRUD for products backed by MongoDB. Existing 27 products from
+        /app/lib/products-data.js are auto-seeded into the "products" collection on the
+        first DB call (via ensureSeeded() in /app/lib/products-server.js).
+        
+        Frontend (/, /comanda-online, /produs/[id]) was refactored to fetch products
+        from the database (no longer reads static products-data.js).
+        
+        Please test these new endpoints:
+        
+        1. PUBLIC ENDPOINTS (no auth):
+           • GET /api/products → expects { products: [...] } with active products only
+             (length should be ~27 on first call due to seed; only active=true)
+           • GET /api/products/:id → expects { product: {...} } for valid id (e.g. "rosii-gradina"),
+             404 with { error: "Product not found" } for invalid id.
+        
+        2. ADMIN PRODUCTS ENDPOINTS (require Authorization: Bearer familygarden2025):
+           • GET /api/admin/products → returns ALL products (including inactive). 401 without auth.
+           • POST /api/admin/products → create with body { name, category, price, unit, ...optional }.
+             - Returns { product } with auto-generated id (slug from name) and sortOrder.
+             - Returns 400 if name/category/price/unit missing.
+             - Returns 401 without auth.
+             - Verify creating a product with same name produces unique id with suffix (-2).
+           • PATCH /api/admin/products/:id → update allowed fields:
+             name, category, description, price, unit, stock, minOrder, featured, season,
+             image, active, sortOrder. Adds updatedAt timestamp.
+             - 404 for unknown id, 400 if no allowed fields, 401 without auth.
+             - Verify numeric coercion (e.g. price as string "9.5" stored as 9.5).
+             - Verify boolean coercion for featured/active.
+           • DELETE /api/admin/products/:id → returns { ok: true }. 404 unknown, 401 no auth.
+        
+        3. EDGE CASES TO VERIFY:
+           • Image field accepts long base64 data URI (~300KB) without error.
+           • Public GET /api/products excludes products with active=false.
+           • Admin GET /api/admin/products includes products with active=false.
+        
+        Use NEXT_PUBLIC_BASE_URL with /api prefix.
+        ADMIN_PASSWORD env var = "familygarden2025".
+        
+        Cleanup: tests should delete any products they create to keep DB clean.
+        Please do NOT delete any of the seed products (id starts with "rosii-gradina",
+        "castraveti", "spanac", etc.).

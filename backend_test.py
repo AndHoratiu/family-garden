@@ -1,403 +1,615 @@
 #!/usr/bin/env python3
+"""
+Comprehensive backend testing for Family Garden Products CRUD API endpoints.
+Tests all public and admin endpoints with proper authentication and edge cases.
+"""
 
 import requests
 import json
-import sys
-from datetime import datetime
+import base64
+import os
+from typing import Dict, List, Any
 
 # Configuration
 BASE_URL = "https://fresh-harvest-152.preview.emergentagent.com/api"
-ADMIN_PASSWORD = "familygarden2025"
+ADMIN_TOKEN = "familygarden2025"
+HEADERS = {"Content-Type": "application/json"}
+ADMIN_HEADERS = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {ADMIN_TOKEN}"
+}
 
-def log_test(test_name, success, details=""):
-    """Log test results"""
+# Track test products for cleanup
+test_products_created = []
+
+def log_test(test_name: str, success: bool, details: str = ""):
+    """Log test results with clear formatting."""
     status = "✅ PASS" if success else "❌ FAIL"
-    print(f"{status}: {test_name}")
+    print(f"{status} {test_name}")
     if details:
-        print(f"   Details: {details}")
+        print(f"   {details}")
     print()
 
-def test_admin_login():
-    """Test POST /api/admin/login endpoint"""
-    print("=== Testing Admin Login (POST /api/admin/login) ===")
-    
-    # Test 1: Valid password
+def make_request(method: str, endpoint: str, headers: Dict = None, data: Dict = None) -> tuple:
+    """Make HTTP request and return (response, success, error_msg)."""
     try:
-        response = requests.post(f"{BASE_URL}/admin/login", 
-                               json={"password": "familygarden2025"},
-                               timeout=10)
+        url = f"{BASE_URL}{endpoint}"
+        kwargs = {"headers": headers or HEADERS}
+        if data:
+            kwargs["json"] = data
         
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("token") == "familygarden2025":
-                log_test("Valid password login", True, f"Response: {data}")
-            else:
-                log_test("Valid password login", False, f"Expected token 'familygarden2025', got: {data}")
-        else:
-            log_test("Valid password login", False, f"Status: {response.status_code}, Response: {response.text}")
+        response = requests.request(method, url, **kwargs)
+        return response, True, ""
     except Exception as e:
-        log_test("Valid password login", False, f"Exception: {str(e)}")
-    
-    # Test 2: Invalid password
-    try:
-        response = requests.post(f"{BASE_URL}/admin/login", 
-                               json={"password": "wrong"},
-                               timeout=10)
-        
-        if response.status_code == 401:
-            data = response.json()
-            log_test("Invalid password login", True, f"Correctly returned 401: {data}")
-        else:
-            log_test("Invalid password login", False, f"Expected 401, got {response.status_code}: {response.text}")
-    except Exception as e:
-        log_test("Invalid password login", False, f"Exception: {str(e)}")
-    
-    # Test 3: Empty body
-    try:
-        response = requests.post(f"{BASE_URL}/admin/login", 
-                               json={},
-                               timeout=10)
-        
-        if response.status_code == 401:
-            data = response.json()
-            log_test("Empty body login", True, f"Correctly returned 401: {data}")
-        else:
-            log_test("Empty body login", False, f"Expected 401, got {response.status_code}: {response.text}")
-    except Exception as e:
-        log_test("Empty body login", False, f"Exception: {str(e)}")
+        return None, False, str(e)
 
-def create_test_order():
-    """Create a test order for admin operations"""
-    print("=== Creating Test Order ===")
+def test_public_products_list():
+    """Test GET /api/products - should return active products only."""
+    print("🔍 Testing Public Products List (GET /api/products)")
     
-    order_data = {
-        "customerName": "Maria Popescu",
-        "customerPhone": "0721234567",
-        "customerEmail": "maria@example.com",
-        "customerAddress": "Str. Florilor 123, Vințu de Jos",
-        "deliveryMethod": "Livrare locală",
-        "paymentMethod": "Ramburs",
-        "items": [
-            {"id": "1", "name": "Roșii", "price": 8, "quantity": 2, "unit": "kg"},
-            {"id": "2", "name": "Castraveți", "price": 6, "quantity": 1, "unit": "kg"}
-        ]
+    response, success, error = make_request("GET", "/products")
+    if not success:
+        log_test("Public products list - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 200:
+        log_test("Public products list - Status", False, f"Expected 200, got {response.status_code}")
+        return False
+    
+    try:
+        data = response.json()
+        if "products" not in data:
+            log_test("Public products list - Structure", False, "Missing 'products' key in response")
+            return False
+        
+        products = data["products"]
+        if not isinstance(products, list):
+            log_test("Public products list - Type", False, "Products should be a list")
+            return False
+        
+        # Should have ~27 products on first call (auto-seeded)
+        if len(products) < 20:
+            log_test("Public products list - Count", False, f"Expected ~27 products, got {len(products)}")
+            return False
+        
+        # All products should be active=true
+        inactive_products = [p for p in products if p.get("active") is False]
+        if inactive_products:
+            log_test("Public products list - Active filter", False, f"Found {len(inactive_products)} inactive products")
+            return False
+        
+        # Check product structure
+        if products:
+            product = products[0]
+            required_fields = ["id", "name", "category", "price", "unit", "stock", "active"]
+            missing_fields = [f for f in required_fields if f not in product]
+            if missing_fields:
+                log_test("Public products list - Fields", False, f"Missing fields: {missing_fields}")
+                return False
+        
+        log_test("Public products list", True, f"Found {len(products)} active products")
+        return True
+        
+    except json.JSONDecodeError:
+        log_test("Public products list - JSON", False, "Invalid JSON response")
+        return False
+
+def test_public_single_product():
+    """Test GET /api/products/:id for valid and invalid IDs."""
+    print("🔍 Testing Public Single Product (GET /api/products/:id)")
+    
+    # Test valid product ID
+    response, success, error = make_request("GET", "/products/rosii-gradina")
+    if not success:
+        log_test("Single product (valid) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 200:
+        log_test("Single product (valid) - Status", False, f"Expected 200, got {response.status_code}")
+        return False
+    
+    try:
+        data = response.json()
+        if "product" not in data:
+            log_test("Single product (valid) - Structure", False, "Missing 'product' key in response")
+            return False
+        
+        product = data["product"]
+        if product.get("id") != "rosii-gradina":
+            log_test("Single product (valid) - ID", False, f"Expected id 'rosii-gradina', got {product.get('id')}")
+            return False
+        
+        log_test("Single product (valid)", True, f"Retrieved product: {product.get('name')}")
+        
+    except json.JSONDecodeError:
+        log_test("Single product (valid) - JSON", False, "Invalid JSON response")
+        return False
+    
+    # Test invalid product ID
+    response, success, error = make_request("GET", "/products/does-not-exist")
+    if not success:
+        log_test("Single product (invalid) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 404:
+        log_test("Single product (invalid) - Status", False, f"Expected 404, got {response.status_code}")
+        return False
+    
+    try:
+        data = response.json()
+        if data.get("error") != "Product not found":
+            log_test("Single product (invalid) - Error", False, f"Expected 'Product not found', got {data.get('error')}")
+            return False
+        
+        log_test("Single product (invalid)", True, "Correctly returned 404 for non-existent product")
+        return True
+        
+    except json.JSONDecodeError:
+        log_test("Single product (invalid) - JSON", False, "Invalid JSON response")
+        return False
+
+def test_admin_products_list():
+    """Test GET /api/admin/products - should return ALL products including inactive."""
+    print("🔍 Testing Admin Products List (GET /api/admin/products)")
+    
+    # Test without authentication
+    response, success, error = make_request("GET", "/admin/products")
+    if not success:
+        log_test("Admin products (no auth) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 401:
+        log_test("Admin products (no auth) - Status", False, f"Expected 401, got {response.status_code}")
+        return False
+    
+    log_test("Admin products (no auth)", True, "Correctly returned 401 without authentication")
+    
+    # Test with authentication
+    response, success, error = make_request("GET", "/admin/products", ADMIN_HEADERS)
+    if not success:
+        log_test("Admin products (with auth) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 200:
+        log_test("Admin products (with auth) - Status", False, f"Expected 200, got {response.status_code}")
+        return False
+    
+    try:
+        data = response.json()
+        if "products" not in data:
+            log_test("Admin products (with auth) - Structure", False, "Missing 'products' key in response")
+            return False
+        
+        products = data["products"]
+        if not isinstance(products, list):
+            log_test("Admin products (with auth) - Type", False, "Products should be a list")
+            return False
+        
+        log_test("Admin products (with auth)", True, f"Retrieved {len(products)} products (including inactive)")
+        return True
+        
+    except json.JSONDecodeError:
+        log_test("Admin products (with auth) - JSON", False, "Invalid JSON response")
+        return False
+
+def test_admin_create_product():
+    """Test POST /api/admin/products - create new products."""
+    print("🔍 Testing Admin Create Product (POST /api/admin/products)")
+    
+    # Test without authentication
+    product_data = {
+        "name": "Test Tomato 12345",
+        "category": "Legume",
+        "price": 9.5,
+        "unit": "lei / kg",
+        "description": "Test product",
+        "stock": 5
     }
     
+    response, success, error = make_request("POST", "/admin/products", data=product_data)
+    if not success:
+        log_test("Create product (no auth) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 401:
+        log_test("Create product (no auth) - Status", False, f"Expected 401, got {response.status_code}")
+        return False
+    
+    log_test("Create product (no auth)", True, "Correctly returned 401 without authentication")
+    
+    # Test with authentication and valid data
+    response, success, error = make_request("POST", "/admin/products", ADMIN_HEADERS, product_data)
+    if not success:
+        log_test("Create product (valid) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 200:
+        log_test("Create product (valid) - Status", False, f"Expected 200, got {response.status_code}")
+        return False
+    
     try:
-        response = requests.post(f"{BASE_URL}/orders", json=order_data, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            order_id = data.get("orderId")
-            log_test("Test order creation", True, f"Created order with ID: {order_id}")
-            return order_id
-        else:
-            log_test("Test order creation", False, f"Status: {response.status_code}, Response: {response.text}")
-            return None
-    except Exception as e:
-        log_test("Test order creation", False, f"Exception: {str(e)}")
-        return None
+        data = response.json()
+        if "product" not in data:
+            log_test("Create product (valid) - Structure", False, "Missing 'product' key in response")
+            return False
+        
+        product = data["product"]
+        if not product.get("id"):
+            log_test("Create product (valid) - ID", False, "Product should have auto-generated ID")
+            return False
+        
+        if not product.get("sortOrder"):
+            log_test("Create product (valid) - Sort", False, "Product should have auto-assigned sortOrder")
+            return False
+        
+        # Track for cleanup
+        test_products_created.append(product["id"])
+        
+        log_test("Create product (valid)", True, f"Created product with ID: {product['id']}")
+        
+    except json.JSONDecodeError:
+        log_test("Create product (valid) - JSON", False, "Invalid JSON response")
+        return False
+    
+    # Test creating product with same name (should get unique ID with suffix)
+    response, success, error = make_request("POST", "/admin/products", ADMIN_HEADERS, product_data)
+    if not success:
+        log_test("Create product (duplicate name) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 200:
+        log_test("Create product (duplicate name) - Status", False, f"Expected 200, got {response.status_code}")
+        return False
+    
+    try:
+        data = response.json()
+        product = data["product"]
+        if not product["id"].endswith("-2"):
+            log_test("Create product (duplicate name) - Suffix", False, f"Expected ID with '-2' suffix, got {product['id']}")
+            return False
+        
+        # Track for cleanup
+        test_products_created.append(product["id"])
+        
+        log_test("Create product (duplicate name)", True, f"Created product with unique ID: {product['id']}")
+        
+    except json.JSONDecodeError:
+        log_test("Create product (duplicate name) - JSON", False, "Invalid JSON response")
+        return False
+    
+    # Test missing required field
+    invalid_data = {"name": "Test", "category": "Legume"}  # Missing price and unit
+    response, success, error = make_request("POST", "/admin/products", ADMIN_HEADERS, invalid_data)
+    if not success:
+        log_test("Create product (missing field) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 400:
+        log_test("Create product (missing field) - Status", False, f"Expected 400, got {response.status_code}")
+        return False
+    
+    log_test("Create product (missing field)", True, "Correctly returned 400 for missing required fields")
+    return True
 
-def test_admin_orders():
-    """Test GET /api/admin/orders endpoint"""
-    print("=== Testing Admin Orders List (GET /api/admin/orders) ===")
+def test_admin_update_product():
+    """Test PATCH /api/admin/products/:id - update existing products."""
+    print("🔍 Testing Admin Update Product (PATCH /api/admin/products/:id)")
     
-    # Test 1: Valid Bearer token
-    try:
-        headers = {"Authorization": f"Bearer {ADMIN_PASSWORD}"}
-        response = requests.get(f"{BASE_URL}/admin/orders", headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            orders = data.get("orders", [])
-            stats = data.get("stats", {})
-            
-            # Verify response structure
-            if "orders" in data and "stats" in data:
-                # Verify stats calculations
-                total_matches = stats.get("total") == len(orders)
-                new_count = len([o for o in orders if o.get("orderStatus") == "new"])
-                new_matches = stats.get("new") == new_count
-                delivered_orders = [o for o in orders if o.get("orderStatus") == "delivered"]
-                revenue = sum(o.get("total", 0) for o in delivered_orders)
-                revenue_matches = stats.get("revenue") == revenue
-                
-                if total_matches and new_matches and revenue_matches:
-                    log_test("Valid Bearer token - orders list", True, 
-                           f"Orders: {len(orders)}, Stats: {stats}")
-                else:
-                    log_test("Valid Bearer token - orders list", False, 
-                           f"Stats mismatch - total:{total_matches}, new:{new_matches}, revenue:{revenue_matches}")
-            else:
-                log_test("Valid Bearer token - orders list", False, f"Missing orders or stats in response: {data}")
-        else:
-            log_test("Valid Bearer token - orders list", False, f"Status: {response.status_code}, Response: {response.text}")
-    except Exception as e:
-        log_test("Valid Bearer token - orders list", False, f"Exception: {str(e)}")
+    if not test_products_created:
+        log_test("Update product - Setup", False, "No test products available for update")
+        return False
     
-    # Test 2: No Authorization header
-    try:
-        response = requests.get(f"{BASE_URL}/admin/orders", timeout=10)
-        
-        if response.status_code == 401:
-            log_test("No Authorization header", True, f"Correctly returned 401: {response.json()}")
-        else:
-            log_test("No Authorization header", False, f"Expected 401, got {response.status_code}: {response.text}")
-    except Exception as e:
-        log_test("No Authorization header", False, f"Exception: {str(e)}")
+    product_id = test_products_created[0]
     
-    # Test 3: Invalid token
+    # Test without authentication
+    update_data = {"stock": 99, "price": "12.5", "featured": True, "active": False}
+    response, success, error = make_request("PATCH", f"/admin/products/{product_id}", data=update_data)
+    if not success:
+        log_test("Update product (no auth) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 401:
+        log_test("Update product (no auth) - Status", False, f"Expected 401, got {response.status_code}")
+        return False
+    
+    log_test("Update product (no auth)", True, "Correctly returned 401 without authentication")
+    
+    # Test with authentication and valid data
+    response, success, error = make_request("PATCH", f"/admin/products/{product_id}", ADMIN_HEADERS, update_data)
+    if not success:
+        log_test("Update product (valid) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 200:
+        log_test("Update product (valid) - Status", False, f"Expected 200, got {response.status_code}")
+        return False
+    
     try:
-        headers = {"Authorization": "Bearer invalid_token"}
-        response = requests.get(f"{BASE_URL}/admin/orders", headers=headers, timeout=10)
+        data = response.json()
+        product = data["product"]
         
-        if response.status_code == 401:
-            log_test("Invalid token", True, f"Correctly returned 401: {response.json()}")
-        else:
-            log_test("Invalid token", False, f"Expected 401, got {response.status_code}: {response.text}")
-    except Exception as e:
-        log_test("Invalid token", False, f"Exception: {str(e)}")
+        # Verify numeric coercion
+        if product.get("price") != 12.5:
+            log_test("Update product (valid) - Numeric coercion", False, f"Expected price 12.5, got {product.get('price')}")
+            return False
+        
+        # Verify boolean coercion
+        if product.get("featured") is not True or product.get("active") is not False:
+            log_test("Update product (valid) - Boolean coercion", False, "Boolean coercion failed")
+            return False
+        
+        # Verify updatedAt timestamp
+        if not product.get("updatedAt"):
+            log_test("Update product (valid) - Timestamp", False, "Missing updatedAt timestamp")
+            return False
+        
+        log_test("Update product (valid)", True, "Successfully updated product with type coercion")
+        
+    except json.JSONDecodeError:
+        log_test("Update product (valid) - JSON", False, "Invalid JSON response")
+        return False
+    
+    # Test with no allowed fields
+    response, success, error = make_request("PATCH", f"/admin/products/{product_id}", ADMIN_HEADERS, {"invalid_field": "value"})
+    if not success:
+        log_test("Update product (no fields) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 400:
+        log_test("Update product (no fields) - Status", False, f"Expected 400, got {response.status_code}")
+        return False
+    
+    log_test("Update product (no fields)", True, "Correctly returned 400 for no allowed fields")
+    
+    # Test with unknown product ID
+    response, success, error = make_request("PATCH", "/admin/products/unknown-id", ADMIN_HEADERS, {"stock": 10})
+    if not success:
+        log_test("Update product (unknown ID) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 404:
+        log_test("Update product (unknown ID) - Status", False, f"Expected 404, got {response.status_code}")
+        return False
+    
+    log_test("Update product (unknown ID)", True, "Correctly returned 404 for unknown product ID")
+    return True
 
-def test_admin_update_order(order_id):
-    """Test PATCH /api/admin/orders/:id endpoint"""
-    print(f"=== Testing Admin Update Order (PATCH /api/admin/orders/{order_id}) ===")
+def test_active_filter_behavior():
+    """Test that public endpoint excludes inactive products after update."""
+    print("🔍 Testing Active Filter Behavior")
     
-    if not order_id:
-        log_test("Admin update order", False, "No order ID available for testing")
-        return
+    if not test_products_created:
+        log_test("Active filter test - Setup", False, "No test products available")
+        return False
     
-    headers = {"Authorization": f"Bearer {ADMIN_PASSWORD}"}
+    # Get public products list (should NOT include the test product we set to active=false)
+    response, success, error = make_request("GET", "/products")
+    if not success:
+        log_test("Active filter (public) - Network", False, f"Network error: {error}")
+        return False
     
-    # Test 1: Update orderStatus to confirmed
+    if response.status_code != 200:
+        log_test("Active filter (public) - Status", False, f"Expected 200, got {response.status_code}")
+        return False
+    
     try:
-        update_data = {"orderStatus": "confirmed"}
-        response = requests.patch(f"{BASE_URL}/admin/orders/{order_id}", 
-                                json=update_data, headers=headers, timeout=10)
+        data = response.json()
+        products = data["products"]
+        test_product_ids = [p["id"] for p in products if p["id"] in test_products_created]
         
-        if response.status_code == 200:
-            data = response.json()
-            order = data.get("order", {})
-            if order.get("orderStatus") == "confirmed" and "updatedAt" in order:
-                log_test("Update orderStatus to confirmed", True, 
-                       f"Status updated, updatedAt: {order.get('updatedAt')}")
-            else:
-                log_test("Update orderStatus to confirmed", False, f"Status not updated correctly: {order}")
-        else:
-            log_test("Update orderStatus to confirmed", False, f"Status: {response.status_code}, Response: {response.text}")
-    except Exception as e:
-        log_test("Update orderStatus to confirmed", False, f"Exception: {str(e)}")
+        if test_product_ids:
+            log_test("Active filter (public)", False, f"Public endpoint should not include inactive test products: {test_product_ids}")
+            return False
+        
+        log_test("Active filter (public)", True, "Public endpoint correctly excludes inactive products")
+        
+    except json.JSONDecodeError:
+        log_test("Active filter (public) - JSON", False, "Invalid JSON response")
+        return False
     
-    # Test 2: Update multiple fields (orderStatus and paymentStatus)
-    try:
-        update_data = {"orderStatus": "delivered", "paymentStatus": "paid"}
-        response = requests.patch(f"{BASE_URL}/admin/orders/{order_id}", 
-                                json=update_data, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            order = data.get("order", {})
-            if (order.get("orderStatus") == "delivered" and 
-                order.get("paymentStatus") == "paid" and 
-                "updatedAt" in order):
-                log_test("Update multiple fields", True, 
-                       f"Both fields updated, updatedAt: {order.get('updatedAt')}")
-            else:
-                log_test("Update multiple fields", False, f"Fields not updated correctly: {order}")
-        else:
-            log_test("Update multiple fields", False, f"Status: {response.status_code}, Response: {response.text}")
-    except Exception as e:
-        log_test("Update multiple fields", False, f"Exception: {str(e)}")
+    # Get admin products list (should include the inactive test product)
+    response, success, error = make_request("GET", "/admin/products", ADMIN_HEADERS)
+    if not success:
+        log_test("Active filter (admin) - Network", False, f"Network error: {error}")
+        return False
     
-    # Test 3: Update with no allowed fields
-    try:
-        update_data = {"random": "value"}
-        response = requests.patch(f"{BASE_URL}/admin/orders/{order_id}", 
-                                json=update_data, headers=headers, timeout=10)
-        
-        if response.status_code == 400:
-            log_test("Update with no allowed fields", True, f"Correctly returned 400: {response.json()}")
-        else:
-            log_test("Update with no allowed fields", False, f"Expected 400, got {response.status_code}: {response.text}")
-    except Exception as e:
-        log_test("Update with no allowed fields", False, f"Exception: {str(e)}")
+    if response.status_code != 200:
+        log_test("Active filter (admin) - Status", False, f"Expected 200, got {response.status_code}")
+        return False
     
-    # Test 4: Update non-existent order
     try:
-        update_data = {"orderStatus": "confirmed"}
-        response = requests.patch(f"{BASE_URL}/admin/orders/non-existent-id", 
-                                json=update_data, headers=headers, timeout=10)
+        data = response.json()
+        products = data["products"]
+        test_product_ids = [p["id"] for p in products if p["id"] in test_products_created]
         
-        if response.status_code == 404:
-            log_test("Update non-existent order", True, f"Correctly returned 404: {response.json()}")
-        else:
-            log_test("Update non-existent order", False, f"Expected 404, got {response.status_code}: {response.text}")
-    except Exception as e:
-        log_test("Update non-existent order", False, f"Exception: {str(e)}")
-    
-    # Test 5: Update without Authorization header
-    try:
-        update_data = {"orderStatus": "confirmed"}
-        response = requests.patch(f"{BASE_URL}/admin/orders/{order_id}", 
-                                json=update_data, timeout=10)
+        if not test_product_ids:
+            log_test("Active filter (admin)", False, "Admin endpoint should include inactive test products")
+            return False
         
-        if response.status_code == 401:
-            log_test("Update without Authorization", True, f"Correctly returned 401: {response.json()}")
-        else:
-            log_test("Update without Authorization", False, f"Expected 401, got {response.status_code}: {response.text}")
-    except Exception as e:
-        log_test("Update without Authorization", False, f"Exception: {str(e)}")
+        log_test("Active filter (admin)", True, "Admin endpoint correctly includes inactive products")
+        return True
+        
+    except json.JSONDecodeError:
+        log_test("Active filter (admin) - JSON", False, "Invalid JSON response")
+        return False
 
-def test_admin_delete_order():
-    """Test DELETE /api/admin/orders/:id endpoint"""
-    print("=== Testing Admin Delete Order (DELETE /api/admin/orders/:id) ===")
+def test_admin_delete_product():
+    """Test DELETE /api/admin/products/:id - delete products."""
+    print("🔍 Testing Admin Delete Product (DELETE /api/admin/products/:id)")
     
-    # Create a test order specifically for deletion
-    delete_order_id = create_test_order()
-    if not delete_order_id:
-        log_test("Admin delete order", False, "Could not create order for deletion test")
-        return
+    if not test_products_created:
+        log_test("Delete product - Setup", False, "No test products available for deletion")
+        return False
     
-    headers = {"Authorization": f"Bearer {ADMIN_PASSWORD}"}
+    product_id = test_products_created[0]
     
-    # Test 1: Delete with valid auth
+    # Test without authentication
+    response, success, error = make_request("DELETE", f"/admin/products/{product_id}")
+    if not success:
+        log_test("Delete product (no auth) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 401:
+        log_test("Delete product (no auth) - Status", False, f"Expected 401, got {response.status_code}")
+        return False
+    
+    log_test("Delete product (no auth)", True, "Correctly returned 401 without authentication")
+    
+    # Test with authentication
+    response, success, error = make_request("DELETE", f"/admin/products/{product_id}", ADMIN_HEADERS)
+    if not success:
+        log_test("Delete product (valid) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 200:
+        log_test("Delete product (valid) - Status", False, f"Expected 200, got {response.status_code}")
+        return False
+    
     try:
-        response = requests.delete(f"{BASE_URL}/admin/orders/{delete_order_id}", 
-                                 headers=headers, timeout=10)
+        data = response.json()
+        if data.get("ok") is not True:
+            log_test("Delete product (valid) - Response", False, f"Expected {{ok: true}}, got {data}")
+            return False
         
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("ok") is True:
-                log_test("Delete with valid auth", True, f"Order deleted successfully: {data}")
-            else:
-                log_test("Delete with valid auth", False, f"Expected {{ok: true}}, got: {data}")
-        else:
-            log_test("Delete with valid auth", False, f"Status: {response.status_code}, Response: {response.text}")
-    except Exception as e:
-        log_test("Delete with valid auth", False, f"Exception: {str(e)}")
-    
-    # Test 2: Delete same order again (should return 404)
-    try:
-        response = requests.delete(f"{BASE_URL}/admin/orders/{delete_order_id}", 
-                                 headers=headers, timeout=10)
+        log_test("Delete product (valid)", True, f"Successfully deleted product {product_id}")
         
-        if response.status_code == 404:
-            log_test("Delete non-existent order", True, f"Correctly returned 404: {response.json()}")
-        else:
-            log_test("Delete non-existent order", False, f"Expected 404, got {response.status_code}: {response.text}")
-    except Exception as e:
-        log_test("Delete non-existent order", False, f"Exception: {str(e)}")
+    except json.JSONDecodeError:
+        log_test("Delete product (valid) - JSON", False, "Invalid JSON response")
+        return False
     
-    # Test 3: Delete without Authorization header
-    try:
-        # Create another order for this test
-        another_order_id = create_test_order()
-        if another_order_id:
-            response = requests.delete(f"{BASE_URL}/admin/orders/{another_order_id}", timeout=10)
-            
-            if response.status_code == 401:
-                log_test("Delete without Authorization", True, f"Correctly returned 401: {response.json()}")
-            else:
-                log_test("Delete without Authorization", False, f"Expected 401, got {response.status_code}: {response.text}")
-        else:
-            log_test("Delete without Authorization", False, "Could not create order for test")
-    except Exception as e:
-        log_test("Delete without Authorization", False, f"Exception: {str(e)}")
+    # Test deleting the same product again (should return 404)
+    response, success, error = make_request("DELETE", f"/admin/products/{product_id}", ADMIN_HEADERS)
+    if not success:
+        log_test("Delete product (again) - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 404:
+        log_test("Delete product (again) - Status", False, f"Expected 404, got {response.status_code}")
+        return False
+    
+    log_test("Delete product (again)", True, "Correctly returned 404 for already deleted product")
+    return True
 
-def test_regression():
-    """Test that existing endpoints still work"""
-    print("=== Testing Regression - Existing Endpoints ===")
+def test_large_image_upload():
+    """Test creating product with large base64 image data."""
+    print("🔍 Testing Large Image Upload")
     
-    # Test 1: GET /api
+    # Create a large base64 string (~300KB)
+    large_data = "A" * (300 * 1024)  # 300KB of 'A' characters
+    base64_image = f"data:image/jpeg;base64,{base64.b64encode(large_data.encode()).decode()}"
+    
+    product_data = {
+        "name": "Test Large Image Product",
+        "category": "Legume",
+        "price": 10.0,
+        "unit": "lei / kg",
+        "description": "Test product with large image",
+        "stock": 1,
+        "image": base64_image
+    }
+    
+    response, success, error = make_request("POST", "/admin/products", ADMIN_HEADERS, product_data)
+    if not success:
+        log_test("Large image upload - Network", False, f"Network error: {error}")
+        return False
+    
+    if response.status_code != 200:
+        log_test("Large image upload - Status", False, f"Expected 200, got {response.status_code}")
+        return False
+    
     try:
-        response = requests.get(f"{BASE_URL}", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("ok") is True and data.get("service") == "Family Garden API":
-                log_test("GET /api", True, f"Response: {data}")
-            else:
-                log_test("GET /api", False, f"Unexpected response: {data}")
-        else:
-            log_test("GET /api", False, f"Status: {response.status_code}, Response: {response.text}")
-    except Exception as e:
-        log_test("GET /api", False, f"Exception: {str(e)}")
+        data = response.json()
+        product = data["product"]
+        
+        if not product.get("image"):
+            log_test("Large image upload - Image", False, "Image field should be preserved")
+            return False
+        
+        # Track for cleanup
+        test_products_created.append(product["id"])
+        
+        log_test("Large image upload", True, f"Successfully created product with large image: {product['id']}")
+        return True
+        
+    except json.JSONDecodeError:
+        log_test("Large image upload - JSON", False, "Invalid JSON response")
+        return False
+
+def cleanup_test_products():
+    """Clean up all test products created during testing."""
+    print("🧹 Cleaning up test products...")
     
-    # Test 2: POST /api/orders (valid)
-    try:
-        order_data = {
-            "customerName": "Test Customer",
-            "customerPhone": "0721234567",
-            "items": [{"id": "1", "name": "Test Product", "price": 10, "quantity": 1, "unit": "buc"}]
-        }
-        response = requests.post(f"{BASE_URL}/orders", json=order_data, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if "orderId" in data and "orderNumber" in data:
-                log_test("POST /api/orders (valid)", True, f"Order created: {data['orderNumber']}")
-                return data["orderId"]  # Return for further tests
-            else:
-                log_test("POST /api/orders (valid)", False, f"Missing orderId or orderNumber: {data}")
+    cleanup_success = True
+    for product_id in test_products_created:
+        response, success, error = make_request("DELETE", f"/admin/products/{product_id}", ADMIN_HEADERS)
+        if success and response.status_code == 200:
+            print(f"   ✅ Deleted {product_id}")
+        elif success and response.status_code == 404:
+            print(f"   ⚠️  {product_id} already deleted")
         else:
-            log_test("POST /api/orders (valid)", False, f"Status: {response.status_code}, Response: {response.text}")
-    except Exception as e:
-        log_test("POST /api/orders (valid)", False, f"Exception: {str(e)}")
-        return None
+            print(f"   ❌ Failed to delete {product_id}: {error if not success else response.status_code}")
+            cleanup_success = False
     
-    # Test 3: GET /api/orders/:id
-    regression_order_id = create_test_order()
-    if regression_order_id:
-        try:
-            response = requests.get(f"{BASE_URL}/orders/{regression_order_id}", timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if "order" in data:
-                    log_test("GET /api/orders/:id", True, f"Order retrieved successfully")
-                else:
-                    log_test("GET /api/orders/:id", False, f"Missing order in response: {data}")
-            else:
-                log_test("GET /api/orders/:id", False, f"Status: {response.status_code}, Response: {response.text}")
-        except Exception as e:
-            log_test("GET /api/orders/:id", False, f"Exception: {str(e)}")
+    if cleanup_success:
+        print("✅ Cleanup completed successfully")
+    else:
+        print("⚠️  Some cleanup operations failed")
     
-    # Test 4: GET /api/orders
-    try:
-        response = requests.get(f"{BASE_URL}/orders", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if "orders" in data and isinstance(data["orders"], list):
-                log_test("GET /api/orders", True, f"Orders list retrieved: {len(data['orders'])} orders")
-            else:
-                log_test("GET /api/orders", False, f"Invalid response structure: {data}")
-        else:
-            log_test("GET /api/orders", False, f"Status: {response.status_code}, Response: {response.text}")
-    except Exception as e:
-        log_test("GET /api/orders", False, f"Exception: {str(e)}")
+    test_products_created.clear()
 
 def main():
-    """Run all admin endpoint tests"""
-    print("🚀 Starting Family Garden Admin Backend Tests")
+    """Run all product API tests."""
+    print("🚀 Starting Family Garden Products CRUD API Testing")
     print(f"Base URL: {BASE_URL}")
-    print(f"Admin Password: {ADMIN_PASSWORD}")
+    print(f"Admin Token: {ADMIN_TOKEN}")
     print("=" * 60)
     
-    # Test admin login
-    test_admin_login()
+    test_results = []
     
-    # Create a test order for admin operations
-    test_order_id = create_test_order()
+    # Run all tests
+    tests = [
+        ("Public Products List", test_public_products_list),
+        ("Public Single Product", test_public_single_product),
+        ("Admin Products List", test_admin_products_list),
+        ("Admin Create Product", test_admin_create_product),
+        ("Admin Update Product", test_admin_update_product),
+        ("Active Filter Behavior", test_active_filter_behavior),
+        ("Large Image Upload", test_large_image_upload),
+        ("Admin Delete Product", test_admin_delete_product),
+    ]
     
-    # Test admin orders list
-    test_admin_orders()
+    for test_name, test_func in tests:
+        try:
+            result = test_func()
+            test_results.append((test_name, result))
+        except Exception as e:
+            print(f"❌ EXCEPTION in {test_name}: {str(e)}")
+            test_results.append((test_name, False))
     
-    # Test admin update order
-    test_admin_update_order(test_order_id)
+    # Cleanup
+    cleanup_test_products()
     
-    # Test admin delete order
-    test_admin_delete_order()
-    
-    # Test regression
-    test_regression()
-    
+    # Summary
+    print("\n" + "=" * 60)
+    print("📊 TEST SUMMARY")
     print("=" * 60)
-    print("🏁 Admin Backend Tests Completed")
+    
+    passed = sum(1 for _, result in test_results if result)
+    total = len(test_results)
+    
+    for test_name, result in test_results:
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"{status} {test_name}")
+    
+    print(f"\nTotal: {passed}/{total} tests passed")
+    
+    if passed == total:
+        print("🎉 ALL TESTS PASSED! Products CRUD API is working correctly.")
+        return True
+    else:
+        print(f"⚠️  {total - passed} tests failed. Please review the issues above.")
+        return False
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    exit(0 if success else 1)

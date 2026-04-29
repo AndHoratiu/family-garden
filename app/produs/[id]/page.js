@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { products } from "@/lib/products-data";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -16,12 +15,52 @@ import {
   Truck,
   Calendar,
   Package,
+  Loader2,
 } from "lucide-react";
 
 const ProductDetail = ({ params }) => {
   const router = useRouter();
-  const product = products.find((p) => p.id === params.id);
-  const [qty, setQty] = useState(product?.minOrder || 1);
+  // Next 15: params can be a Promise; safely unwrap if needed
+  const resolved = typeof params?.then === "function" ? use(params) : params;
+  const id = resolved?.id;
+
+  const [product, setProduct] = useState(null);
+  const [allProducts, setAllProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [qty, setQty] = useState(1);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const [pRes, listRes] = await Promise.all([
+          fetch(`/api/products/${id}`, { cache: "no-store" }),
+          fetch(`/api/products`, { cache: "no-store" }),
+        ]);
+        const pData = await pRes.json();
+        const listData = await listRes.json();
+        if (!mounted) return;
+        if (pRes.ok && pData.product) {
+          setProduct(pData.product);
+          setQty(pData.product.minOrder || 1);
+        }
+        if (listRes.ok) setAllProducts(listData.products || []);
+      } catch {
+        // ignore
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="mx-auto flex max-w-3xl items-center justify-center px-4 py-32">
+        <Loader2 className="h-6 w-6 animate-spin text-[#5b7a5f]" />
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -34,7 +73,7 @@ const ProductDetail = ({ params }) => {
     );
   }
 
-  const related = products
+  const related = allProducts
     .filter((p) => p.category === product.category && p.id !== product.id)
     .slice(0, 3);
 
@@ -64,15 +103,18 @@ const ProductDetail = ({ params }) => {
             <Badge variant="outline" className="rounded-full border-[#4f8f43] text-[#2f6a36]">
               {product.category}
             </Badge>
-            {product.stock <= 10 && (
+            {product.stock <= 10 && product.stock > 0 && (
               <Badge className="rounded-full bg-[#f59e0b] hover:bg-[#f59e0b]">Stoc limitat</Badge>
+            )}
+            {product.stock === 0 && (
+              <Badge className="rounded-full bg-red-500 hover:bg-red-500">Indisponibil</Badge>
             )}
           </div>
           <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">{product.name}</h1>
           <p className="text-lg leading-8 text-[#516454]">{product.description}</p>
 
           <div className="flex items-baseline gap-2 pt-2">
-            <span className="text-5xl font-bold text-[#2f6a36]">{product.price.toFixed(2)}</span>
+            <span className="text-5xl font-bold text-[#2f6a36]">{Number(product.price).toFixed(2)}</span>
             <span className="text-xl font-semibold text-[#5b7a5f]">{product.unit}</span>
           </div>
 
@@ -102,8 +144,8 @@ const ProductDetail = ({ params }) => {
             <span className="ml-auto text-lg font-bold">{(product.price * qty).toFixed(2)} lei</span>
           </div>
 
-          <Button onClick={handleAdd} size="lg" className="w-full rounded-full bg-[#4f8f43] hover:bg-[#3f7a35]">
-            <ShoppingBasket className="mr-2 h-4 w-4" /> Adaugă în coș
+          <Button onClick={handleAdd} disabled={product.stock === 0} size="lg" className="w-full rounded-full bg-[#4f8f43] hover:bg-[#3f7a35]">
+            <ShoppingBasket className="mr-2 h-4 w-4" /> {product.stock === 0 ? "Indisponibil" : "Adaugă în coș"}
           </Button>
 
           <ul className="space-y-2 pt-2 text-sm text-[#516454]">
@@ -129,7 +171,7 @@ const ProductDetail = ({ params }) => {
                 <div className="px-2 pt-3 pb-2">
                   <h3 className="font-semibold">{p.name}</h3>
                   <div className="mt-1 flex items-baseline gap-1">
-                    <span className="text-lg font-bold text-[#2f6a36]">{p.price.toFixed(2)} lei</span>
+                    <span className="text-lg font-bold text-[#2f6a36]">{Number(p.price).toFixed(2)} lei</span>
                     <span className="text-xs text-[#5b7a5f]">{p.unit}</span>
                   </div>
                 </div>

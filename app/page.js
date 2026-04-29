@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { siteContent, siteImages } from "@/lib/site-content";
-import { products, productCategories } from "@/lib/products-data";
+import { getAllProducts } from "@/lib/products-server";
 import { Button } from "@/components/ui/button";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const productCategories = ["Toate", "Legume", "Fructe", "Flori", "Răsaduri", "Produse artizanale"];
 import {
   getCurrentSeasonKey,
   isProductInSeason,
@@ -56,7 +61,8 @@ const stockBadge = (p) => {
   return { label: "În stoc", cls: "bg-emerald-100 text-emerald-700" };
 };
 
-const HomePage = () => {
+const HomePage = async () => {
+  const products = await getAllProducts({ activeOnly: true });
   const featured = products.filter((p) => p.featured && p.active).slice(0, 4);
   const currentSeasonKey = getCurrentSeasonKey();
   const currentSeason = SEASONS[currentSeasonKey];
