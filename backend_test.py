@@ -10,9 +10,9 @@ import os
 import time
 from typing import Dict, Any, List
 
-# Configuration
-BASE_URL = "https://fresh-harvest-152.preview.emergentagent.com/api"
-ADMIN_TOKEN = "familygarden2025"
+# Configuration — read from env (no hardcoding for production safety)
+BASE_URL = os.getenv("NEXT_PUBLIC_BASE_URL", "http://localhost:3000").rstrip("/") + "/api"
+ADMIN_TOKEN = os.getenv("ADMIN_PASSWORD", "")
 HEADERS = {"Content-Type": "application/json"}
 ADMIN_HEADERS = {
     "Content-Type": "application/json",
