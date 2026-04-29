@@ -57,19 +57,26 @@ const ComandaOnlinePage = () => {
 
   // Fetch products + settings from MongoDB
   useEffect(() => {
-    let mounted = true;
-    (async () => {
+    let cancelled = false;
+
+    const load = async () => {
       try {
-        const [pRes, sRes] = await Promise.all([
-          fetch("/api/products", { cache: "no-store" }),
-          fetch("/api/settings", { cache: "no-store" }),
-        ]);
+        const pRes = await fetch("/api/products", { cache: "no-store" });
         const pData = await pRes.json();
+        if (cancelled) return;
+        const list = Array.isArray(pData.products) ? pData.products : [];
+        setProducts(list);
+        setProductsLoading(false);
+      } catch (e) {
+        console.error("[comanda-online] products fetch error:", e);
+        if (!cancelled) setProductsLoading(false);
+      }
+
+      try {
+        const sRes = await fetch("/api/settings", { cache: "no-store" });
         const sData = await sRes.json();
-        if (!mounted) return;
-        setProducts(Array.isArray(pData.products) ? pData.products : []);
+        if (cancelled) return;
         setSettings(sData.settings || null);
-        // Default delivery method based on availability
         const d = sData.settings?.delivery;
         const p = sData.settings?.payment;
         if (d) {
@@ -80,13 +87,13 @@ const ComandaOnlinePage = () => {
           if (!p.rambursEnabled && p.onlineEnabled) setPayment("Plată online");
           else if (p.rambursEnabled) setPayment("Ramburs");
         }
-      } catch {
-        if (mounted) setProducts([]);
-      } finally {
-        if (mounted) setProductsLoading(false);
+      } catch (e) {
+        console.error("[comanda-online] settings fetch error:", e);
       }
-    })();
-    return () => { mounted = false; };
+    };
+
+    load();
+    return () => { cancelled = true; };
   }, []);
 
   // Hydrate cart from localStorage (initial + redirect from product detail)
@@ -116,12 +123,12 @@ const ComandaOnlinePage = () => {
   const visibleProducts = useMemo(() => {
     return products.filter((product) => {
       const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase()) ||
-        product.description.toLowerCase().includes(search.toLowerCase());
+        (product.description || "").toLowerCase().includes(search.toLowerCase());
       const matchesCategory = category === "Toate" || product.category === category;
       const matchesSeason = isProductInSeason(product.season, season);
       return matchesSearch && matchesCategory && matchesSeason && product.active;
     });
-  }, [search, category, season]);
+  }, [products, search, category, season]);
 
   const cartItems = useMemo(() => {
     return Object.entries(cart)
@@ -131,7 +138,7 @@ const ComandaOnlinePage = () => {
         return product ? { ...product, quantity: qty } : null;
       })
       .filter(Boolean);
-  }, [cart]);
+  }, [cart, products]);
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const deliveryEnabled = settings?.delivery?.enabled !== false;
