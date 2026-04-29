@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter",
 const playfair = Playfair_Display({ subsets: ["latin", "latin-ext"], variable: "--font-playfair", display: "swap", weight: ["400", "500", "600", "700", "800"] });
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://familygarden.ro";
-const FALLBACK_LOGO = "https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg";
+const FALLBACK_LOGO = "https://customer-assets.emergentagent.com/job_fresh-harvest-152/artifacts/tqfpgjzu_Screenshot_20260429_205344_WhatsApp.jpg";
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
