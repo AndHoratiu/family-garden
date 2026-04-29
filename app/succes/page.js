@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2, Package, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { siteContent } from "@/lib/site-content";
 
-const SuccessPage = () => {
+const SuccessContent = () => {
   const params = useSearchParams();
   const orderId = params.get("order");
   const [order, setOrder] = useState(null);
@@ -92,5 +92,17 @@ const SuccessPage = () => {
     </div>
   );
 };
+
+const SuccessFallback = () => (
+  <div className="mx-auto flex min-h-[50vh] max-w-3xl items-center justify-center px-4">
+    <Loader2 className="h-6 w-6 animate-spin text-[#5b7a5f]" />
+  </div>
+);
+
+const SuccessPage = () => (
+  <Suspense fallback={<SuccessFallback />}>
+    <SuccessContent />
+  </Suspense>
+);
 
 export default SuccessPage;
