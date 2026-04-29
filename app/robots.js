@@ -7,6 +7,7 @@ export default function robots() {
         disallow: ["/admin", "/api/admin"],
       },
     ],
-    sitemap: "https://family-garden.ro/sitemap.xml",
+    sitemap: "https://familygarden.ro/sitemap.xml",
+    host: "https://familygarden.ro",
   };
 }

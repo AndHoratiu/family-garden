@@ -1,6 +1,6 @@
 import { products } from "@/lib/products-data";
 
-const BASE = "https://family-garden.ro";
+const BASE = "https://familygarden.ro";
 
 export default function sitemap() {
   const staticPaths = [

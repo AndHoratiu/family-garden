@@ -5,21 +5,15 @@ import SiteFooter from "@/components/site-footer";
 import WhatsAppButton from "@/components/whatsapp-button";
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({
-  subsets: ["latin", "latin-ext"],
-  variable: "--font-inter",
-  display: "swap",
-});
+const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter", display: "swap" });
+const playfair = Playfair_Display({ subsets: ["latin", "latin-ext"], variable: "--font-playfair", display: "swap", weight: ["400", "500", "600", "700", "800"] });
 
-const playfair = Playfair_Display({
-  subsets: ["latin", "latin-ext"],
-  variable: "--font-playfair",
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
-});
+const SITE_URL = "https://familygarden.ro";
+const SITE_LOGO = "https://familygarden.ro/og-image.jpg";
+const FALLBACK_LOGO = "https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg";
 
 export const metadata = {
-  metadataBase: new URL("https://family-garden.ro"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Family Garden – Natură proaspătă pentru acasă | Vințu de Jos, Alba",
     template: "%s | Family Garden",
@@ -27,36 +21,27 @@ export const metadata = {
   description:
     "Family Garden – legume, fructe, flori și răsaduri cultivate cu dragoste în Vințu de Jos, Alba. Comandă online direct de la producător, livrare locală.",
   keywords: [
-    "legume proaspete",
-    "răsaduri",
-    "flori sezoniere",
-    "zacuscă de casă",
-    "sirop și dulceață",
-    "Family Garden",
-    "Vințu de Jos",
-    "Alba",
-    "produse locale",
-    "fără chimicale",
-    "livrare locală",
+    "legume proaspete", "răsaduri", "flori sezoniere", "zacuscă de casă", "sirop și dulceață",
+    "Family Garden", "Vințu de Jos", "Alba", "produse locale", "fără chimicale", "livrare locală",
   ],
-  authors: [{ name: "Family Garden" }],
+  authors: [{ name: "Family Garden", url: SITE_URL }],
   creator: "Family Garden",
   publisher: "Family Garden",
+  alternates: { canonical: SITE_URL },
   openGraph: {
     title: "Family Garden – Natură proaspătă pentru acasă",
-    description:
-      "Legume, fructe, flori și răsaduri cultivate local în Vințu de Jos. Comandă online cu livrare locală.",
-    url: "/",
+    description: "Legume, fructe, flori și răsaduri cultivate local în Vințu de Jos. Comandă online cu livrare locală.",
+    url: SITE_URL,
     siteName: "Family Garden",
     locale: "ro_RO",
     type: "website",
-    images: [{ url: "https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg", width: 1200, height: 630, alt: "Family Garden" }],
+    images: [{ url: FALLBACK_LOGO, width: 1200, height: 630, alt: "Family Garden" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Family Garden – Natură proaspătă pentru acasă",
     description: "Legume, fructe, flori și răsaduri cultivate local. Comandă online direct de la producător.",
-    images: ["https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg"],
+    images: [FALLBACK_LOGO],
   },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
   icons: { icon: "/favicon.ico" },
@@ -73,7 +58,8 @@ const App = ({ children }) => {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: "Family Garden",
-    image: "https://andhoratiu.github.io/proiect-site-family-garden/LOGO.jpeg",
+    url: SITE_URL,
+    image: FALLBACK_LOGO,
     description: "Legume, fructe, flori și răsaduri cultivate local în Vințu de Jos, Alba.",
     address: {
       "@type": "PostalAddress",
@@ -83,7 +69,7 @@ const App = ({ children }) => {
       addressCountry: "RO",
     },
     telephone: ["+40749476386", "+40755736374"],
-    email: ["b.androne@yahoo.com", "androne.horatiuro@gmail.com"],
+    email: ["comenzi@familygarden.ro", "b.androne@yahoo.com", "androne.horatiuro@gmail.com"],
     openingHours: "Mo-Sa",
     priceRange: "$",
   };
@@ -92,6 +78,8 @@ const App = ({ children }) => {
     <html lang="ro" className={`${inter.variable} ${playfair.variable}`}>
       <head>
         <link rel="preconnect" href="https://andhoratiu.github.io" />
+        <link rel="preconnect" href="https://customer-assets.emergentagent.com" />
+        <link rel="preconnect" href="https://drive.google.com" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson) }} />
       </head>
       <body className="min-h-screen bg-[#f8f5ed] font-sans text-[#1f4023] antialiased">
