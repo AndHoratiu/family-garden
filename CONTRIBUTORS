@@ -1,0 +1,31 @@
+Contributors
+This project is a joint effort, maintained equally by two collaborators. Both contributors share full ownership, decision-making, and responsibility for the codebase.
+
+Core Team
+[Androne Horațiu Gligor] — 
+Role: Co-Owner & Developer
+[Androne Vasile Traian] — 
+Role: Co-Owner & Developer
+
+Collaboration Model
+This project follows a 50/50 partnership model:
+
+All major decisions are made jointly
+Both contributors have equal rights to review and merge changes
+Work is divided based on availability and expertise, not hierarchy
+All commits and pull requests are reviewed by the other collaborator before merging
+
+
+How We Work
+
+Changes are developed on separate branches
+A pull request is opened for every meaningful change
+The other collaborator reviews and approves before merging
+Releases are tagged only when both contributors agree
+
+
+Communication
+Day-to-day collaboration is managed via [GitHub Issues / email / WhatsApp].
+
+Acknowledgements
+This is a family project built with shared passion and equal dedication. Both contributors are proud co-authors of everything in this repository.
